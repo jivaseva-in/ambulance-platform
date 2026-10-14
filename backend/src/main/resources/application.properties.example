@@ -3,11 +3,11 @@ spring.application.name=ambulance-service-api
 # PostgreSQL Configuration
 spring.datasource.url=jdbc:postgresql://localhost:5432/ambulance_db
 spring.datasource.username=ambulance_user
-spring.datasource.password=<YOUR_PASSWORD_HERE>
+spring.datasource.password=<YOUR_DATABASE_PASSWORD_HERE>
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.format_sql=true
 
 # JWT Properties
-app.jwt.secret=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+app.jwt.secret=<YOUR_RANDOM_32+_CHAR_SECRET_HERE>
 app.jwt.expiration-ms=86400000
