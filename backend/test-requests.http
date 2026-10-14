@@ -1,0 +1,154 @@
+### =========================================================================
+### STEP 1: ANONYMOUS GUEST EMERGENCY BOOKING (NO LOGIN / NO TOKEN)
+### =========================================================================
+# @name createBooking
+POST http://localhost:8080/api/v1/bookings
+Content-Type: application/json
+
+{
+  "contactName": "John Doe",
+  "contactPhone": "+1234567890",
+  "pickupAddress": "452 Elm Street, Block B",
+  "pickupLatitude": 12.9716,
+  "pickupLongitude": 77.5946,
+  "destinationAddress": "City General Hospital",
+  "destinationLatitude": 12.9780,
+  "destinationLongitude": 77.6000,
+  "patientCondition": "Severe chest pain, conscious",
+  "ambulanceType": "ADVANCED_LIFE_SUPPORT",
+  "bookingChannel": "ONLINE_WEB"
+}
+
+### =========================================================================
+### STEP 2: DRIVER LOGIN (Dave Driver was already created and registered)
+### =========================================================================
+# @name driverLogin
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "dave.driver@example.com",
+  "password": "<YOUR_DRIVER_PASSWORD>"
+}
+
+### =========================================================================
+### CONFIGURATION VARIABLES FOR DOWNSTREAM STEPS:
+### If dynamic variable resolution has issues, you can hardcode the booking ID below:
+### =========================================================================
+@bookingId = 4
+@driverJwt = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJkYXZlLmRyaXZlckBleGFtcGxlLmNvbSIsImlhdCI6MTc5MTU1Njc5NSwiZXhwIjoxNzkxNjQzMTk1fQ.Ga3Niig5FI3OhsL0dgBnT7FDD3D0TaUPTb3mNushS3SCNtZ0X0bNNJMQ65npm1oI
+
+### =========================================================================
+### STEP 3: PUBLIC LIVE TRACKING (NO TOKEN REQUIRED)
+### Note: If testing standalone, replace {{bookingId}} with 1
+### =========================================================================
+GET http://localhost:8080/api/v1/bookings/{{bookingId}}
+
+### =========================================================================
+### STEP 4: DRIVER CHECKS AVAILABLE EMERGENCY QUEUE (REQUIRES DRIVER TOKEN)
+### =========================================================================
+GET http://localhost:8080/api/v1/bookings/available
+Authorization: Bearer {{driverJwt}}
+
+### =========================================================================
+### STEP 5: DRIVER ACCEPTS THE BOOKING (Status -> ASSIGNED)
+### =========================================================================
+PUT http://localhost:8080/api/v1/bookings/{{bookingId}}/accept
+Authorization: Bearer {{driverJwt}}
+
+### =========================================================================
+### STEP 6: DRIVER UPDATES STATUS TO IN_TRANSIT
+### =========================================================================
+PUT http://localhost:8080/api/v1/bookings/{{bookingId}}/status
+Authorization: Bearer {{driverJwt}}
+Content-Type: application/json
+
+{
+  "status": "IN_TRANSIT"
+}
+
+### =========================================================================
+### STEP 7: DRIVER UPDATES STATUS TO COMPLETED
+### =========================================================================
+PUT http://localhost:8080/api/v1/bookings/{{bookingId}}/status
+Authorization: Bearer {{driverJwt}}
+Content-Type: application/json
+
+{
+  "status": "COMPLETED"
+}
+
+### =========================================================================
+### STEP 8: VERIFY FINAL STATUS VIA PUBLIC TRACKING ENDPOINT
+### =========================================================================
+GET http://localhost:8080/api/v1/bookings/{{bookingId}}
+
+### =========================================================================
+### STEP 9: ADMIN / DISPATCHER INTAKE VIA PHONE CALL
+### =========================================================================
+# @name adminLogin
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin@example.com",
+  "password": "<YOUR_ADMIN_PASSWORD>"
+}
+
+### =========================================================================
+### CONFIGURATION VARIABLES FOR DOWNSTREAM STEPS:
+### If dynamic variable resolution has issues, you can hardcode the booking ID below:
+### =========================================================================
+@adminJwt = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJhZG1pbkBleGFtcGxlLmNvbSIsImlhdCI6MTc5MTU1Njc1OSwiZXhwIjoxNzkxNjQzMTU5fQ.BONSiRyOMgIOBlVsHNOKoFBmldQ3cl3UXZV7prHiYWDpgTbycjwbzqa1U9xU2z9t
+
+### Create Phone Booking as Dispatcher
+POST http://localhost:8080/api/v1/dispatch/phone-call
+Authorization: Bearer {{adminJwt}}
+Content-Type: application/json
+
+{
+  "callerName": "Emergency Witness Sarah",
+  "callerPhone": "+1555123456",
+  "pickupAddress": "Highway 101, Exit 24 Accident Spot",
+  "pickupLatitude": 12.9200,
+  "pickupLongitude": 77.5800,
+  "destinationHospital": "St. Jude Trauma Care",
+  "triageNotes": "Multi-vehicle collision, 2 injured persons conscious",
+  "ambulanceType": "ADVANCED_LIFE_SUPPORT",
+  "dispatcherInternalNotes": "Called police dispatch unit #4 as well"
+}
+
+### =========================================================================
+### STEP 10: INCOMING WHATSAPP EMERGENCY MESSAGE / LOCATION PIN
+### =========================================================================
+# @name whatsappBooking
+POST http://localhost:8080/api/v1/webhooks/whatsapp
+Content-Type: application/json
+
+{
+  "fromNumber": "+1999888777",
+  "senderName": "WhatsApp User Mark",
+  "messageBody": "Need ambulance immediately! Breathing difficulty.",
+  "latitude": 12.9540,
+  "longitude": 77.5920,
+  "addressText": "77 Palm Avenue, Apartment 302"
+}
+
+### =========================================================================
+### STEP 11: DRIVER PUSHES LIVE GPS COORDINATES (IN TRANSIT)
+### =========================================================================
+PUT http://localhost:8080/api/v1/bookings/{{bookingId}}/location
+Authorization: Bearer {{driverJwt}}
+Content-Type: application/json
+
+{
+  "latitude": 12.9730,
+  "longitude": 77.5960,
+  "speedKmh": 55.4,
+  "headingDegrees": 182.0
+}
+
+### =========================================================================
+### STEP 12: PUBLIC PATIENT MAP VIEW (LIVE DRIVER GPS STREAM)
+### =========================================================================
+GET http://localhost:8080/api/v1/bookings/{{bookingId}}/location
