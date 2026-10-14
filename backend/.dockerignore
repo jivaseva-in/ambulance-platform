@@ -1,0 +1,17 @@
+# Git and IDE files
+.git
+.idea
+*.iml
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Build output
+target/
+
+# Log files
+*.log
+
+# Local secrets file
+application.properties
