@@ -35,7 +35,7 @@ Content-Type: application/json
 ### CONFIGURATION VARIABLES FOR DOWNSTREAM STEPS:
 ### If dynamic variable resolution has issues, you can hardcode the booking ID below:
 ### =========================================================================
-@bookingId = 4
+@bookingId = 1
 @driverJwt = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiJkYXZlLmRyaXZlckBleGFtcGxlLmNvbSIsImlhdCI6MTc5MTU1Njc5NSwiZXhwIjoxNzkxNjQzMTk1fQ.Ga3Niig5FI3OhsL0dgBnT7FDD3D0TaUPTb3mNushS3SCNtZ0X0bNNJMQ65npm1oI
 
 ### =========================================================================
@@ -84,14 +84,14 @@ Content-Type: application/json
 GET http://localhost:8080/api/v1/bookings/{{bookingId}}
 
 ### =========================================================================
-### STEP 9: ADMIN / DISPATCHER INTAKE VIA PHONE CALL
+### STEP 9: DISPATCHER INTAKE VIA PHONE CALL
 ### =========================================================================
-# @name adminLogin
+# @name dispatcherLogin
 POST http://localhost:8080/api/v1/auth/login
 Content-Type: application/json
 
 {
-  "username": "admin@example.com",
+  "username": "peter.dispatcher@example.com",
   "password": "<YOUR_ADMIN_PASSWORD>"
 }
 

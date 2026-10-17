@@ -63,6 +63,10 @@ public class Booking {
   private User requester; // Nullable if booked via phone by dispatcher for unregistered caller
 
   @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "recorded_by_id")
+  private User recordedBy; // Staff user who entered the booking on behalf of the caller
+
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "driver_id")
   private User assignedDriver; // Null until accepted by a driver
 

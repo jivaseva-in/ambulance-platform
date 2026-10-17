@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -40,6 +41,11 @@ public class SecurityConfig {
   }
 
   @Bean
+  public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+    return authConfig.getAuthenticationManager();
+  }
+
+  @Bean
   public DaoAuthenticationProvider authenticationProvider() {
     DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
     authProvider.setUserDetailsService(userDetailsService);
@@ -48,28 +54,24 @@ public class SecurityConfig {
   }
 
   @Bean
-  public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-    return authConfig.getAuthenticationManager();
-  }
-
-  @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOriginPatterns(List.of(
-        "http://localhost:*",
-        "http://127.0.0.1:*",
-        "http://192.168.*:*",
-        "http://10.*:*"
-    ));
+    configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-    configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"));
-    configuration.setExposedHeaders(List.of("Authorization"));
+    configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
     configuration.setAllowCredentials(true);
-    configuration.setMaxAge(3600L);
-
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);
     return source;
+  }
+
+  /**
+   * This bean is crucial. It tells Spring Security to completely ignore security checks
+   * for static assets. This is more efficient and avoids filter chain issues.
+   */
+  @Bean
+  public WebSecurityCustomizer webSecurityCustomizer() {
+    return (web) -> web.ignoring().requestMatchers("/js/**", "/css/**", "/images/**", "/components/**", "/favicon.ico");
   }
 
   @Bean
@@ -80,36 +82,22 @@ public class SecurityConfig {
         .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
-            // 1. Static Web GUI Resources & HTML Partials (Permits /components/** and /*.html)
-            .requestMatchers(
-                "/",
-                "/index.html",
-                "/*.html",
-                "/components/**",
-                "/js/**",
-                "/css/**",
-                "/images/**",
-                "/favicon.ico"
-            ).permitAll()
+            // GUI Entrypoint
+            .requestMatchers("/", "/index.html").permitAll()
 
-            // 2. Pre-flight OPTIONS checks
-            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            // Static frontend assets (defense in depth in case the web security ignore list is bypassed)
+            .requestMatchers("/js/**", "/components/**", "/css/**", "/images/**", "/favicon.ico", "/favicon.svg").permitAll()
 
-            // 3. Public Authentication Endpoints
+            // Public API Endpoints
             .requestMatchers("/api/v1/auth/**").permitAll()
-
-            // 4. Public Emergency Guest Bookings & Live Tracking
             .requestMatchers(HttpMethod.POST, "/api/v1/bookings").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/bookings/*").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/bookings/*/location").permitAll()
 
-            // 5. Public Ingestion Webhooks
-            .requestMatchers(HttpMethod.POST, "/api/v1/webhooks/**").permitAll()
+            // Swagger Docs
+            .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
-            // 6. Swagger & OpenAPI Documentation
-            .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-
-            // 7. All other endpoints require authentication
+            // All other requests must be authenticated
             .anyRequest().authenticated()
         );
 
