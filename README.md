@@ -156,7 +156,15 @@ spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=false
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
-# JWT Security Secrets (Must be at least 256-bit / 32 characters)
+# Super Admin User (created on first startup)
+app.superadmin.email=superadmin@example.com
+app.superadmin.password=<YOUR_SUPERADMIN_PASSWORD_HERE>
+app.superadmin.phone=<YOUR_SUPERADMIN_PHONE_HERE>
+
+# Registration rules
+app.registration.admin-invite-code=<YOUR_ADMIN_INVITE_CODE_HERE>
+
+# JWT Properties
 app.jwt.secret=<YOUR_RANDOM_32+_CHAR_SECRET_HERE>
 app.jwt.expiration-ms=86400000
 

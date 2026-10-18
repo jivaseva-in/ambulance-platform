@@ -4,6 +4,8 @@ import com.ambulanceservice.booking.dto.BookingResponse;
 import com.ambulanceservice.booking.entity.BookingChannel;
 import com.ambulanceservice.booking.service.BookingService;
 import com.ambulanceservice.booking.dto.CreateBookingRequest;
+import com.ambulanceservice.dispatch.dto.AssignDriverRequest;
+import com.ambulanceservice.dispatch.dto.AvailableDriverResponse;
 import com.ambulanceservice.dispatch.dto.PhoneBookingRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/dispatch")
 @RequiredArgsConstructor
@@ -22,7 +26,7 @@ public class DispatchController {
   private final BookingService bookingService;
 
   @PostMapping("/phone-call")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DISPATCHER', 'ADMIN', 'SUPER_ADMIN')")
   public ResponseEntity<BookingResponse> createPhoneBooking(
       @Valid @RequestBody PhoneBookingRequest request,
       @AuthenticationPrincipal UserDetails dispatcher) {
@@ -43,7 +47,36 @@ public class DispatchController {
         BookingChannel.PHONE_DISPATCH
     );
 
-    BookingResponse response = bookingService.createBooking(bookingRequest, dispatcher.getUsername());
+    BookingResponse response = bookingService.createBooking(bookingRequest, dispatcher.getUsername(), false);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  @GetMapping("/bookings/open")
+  @PreAuthorize("hasAnyRole('DISPATCHER', 'ADMIN', 'SUPER_ADMIN')")
+  public ResponseEntity<List<BookingResponse>> getOpenDispatchBookings() {
+    return ResponseEntity.ok(bookingService.getOpenDispatchBookings());
+  }
+
+  @GetMapping("/drivers/available")
+  @PreAuthorize("hasAnyRole('DISPATCHER', 'ADMIN', 'SUPER_ADMIN')")
+  public ResponseEntity<List<AvailableDriverResponse>> getAvailableDrivers() {
+    return ResponseEntity.ok(bookingService.getAvailableDriversForDispatch());
+  }
+
+  @PutMapping("/bookings/{bookingId}/assign")
+  @PreAuthorize("hasAnyRole('DISPATCHER', 'ADMIN', 'SUPER_ADMIN')")
+  public ResponseEntity<BookingResponse> assignDriver(
+      @PathVariable Long bookingId,
+      @Valid @RequestBody AssignDriverRequest request,
+      @AuthenticationPrincipal UserDetails dispatcher) {
+    return ResponseEntity.ok(bookingService.assignDriver(bookingId, request, dispatcher.getUsername()));
+  }
+
+  @PutMapping("/bookings/{bookingId}/unassign")
+  @PreAuthorize("hasAnyRole('DISPATCHER', 'ADMIN', 'SUPER_ADMIN')")
+  public ResponseEntity<BookingResponse> unassignDriver(
+      @PathVariable Long bookingId,
+      @AuthenticationPrincipal UserDetails dispatcher) {
+    return ResponseEntity.ok(bookingService.unassignDriver(bookingId, dispatcher.getUsername()));
   }
 }

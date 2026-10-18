@@ -31,6 +31,11 @@ async function request(endpoint, options = {}) {
 
 export const api = {
     auth: {
+        register: (payload) =>
+            request('/auth/register', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            }),
         login: (username, password) =>
             request('/auth/login', {
                 method: 'POST',
@@ -77,8 +82,57 @@ export const api = {
         logPhoneCall: (payload) =>
             request('/dispatch/phone-call', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${state.adminToken}` },
+                headers: { 'Authorization': `Bearer ${state.dispatcherToken}` },
                 body: JSON.stringify(payload)
+            }),
+        getOpenBookings: () =>
+            request('/dispatch/bookings/open', {
+                headers: { 'Authorization': `Bearer ${state.dispatcherToken}` }
+            }),
+        getAvailableDrivers: () =>
+            request('/dispatch/drivers/available', {
+                headers: { 'Authorization': `Bearer ${state.dispatcherToken}` }
+            }),
+        assignDriver: (bookingId, driverId) =>
+            request(`/dispatch/bookings/${bookingId}/assign`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.dispatcherToken}` },
+                body: JSON.stringify({ driverId })
+            }),
+        unassignDriver: (bookingId) =>
+            request(`/dispatch/bookings/${bookingId}/unassign`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.dispatcherToken}` }
+            })
+    },
+    admin: {
+        getPendingUsers: () =>
+            request('/admin/users/pending', {
+                headers: { 'Authorization': `Bearer ${state.adminToken}` }
+            }),
+        approveUser: (userId) =>
+            request(`/admin/users/${userId}/approve`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.adminToken}` }
+            }),
+        rejectUser: (userId) =>
+            request(`/admin/users/${userId}/reject`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.adminToken}` }
+            }),
+        suspendUser: (userId) =>
+            request(`/admin/users/${userId}/suspend`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.adminToken}` }
+            }),
+        reactivateUser: (userId) =>
+            request(`/admin/users/${userId}/reactivate`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.adminToken}` }
+            }),
+        getAllUsers: () =>
+            request('/admin/users', {
+                headers: { 'Authorization': `Bearer ${state.adminToken}` }
             })
     }
 };

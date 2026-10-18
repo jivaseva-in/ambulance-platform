@@ -8,6 +8,18 @@ spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.format_sql=true
 
+# Super Admin User (created on first startup)
+app.superadmin.email=superadmin@example.com
+app.superadmin.password=<YOUR_SUPERADMIN_PASSWORD_HERE>
+app.superadmin.phone=+1664523112
+
+# Registration rules
+app.registration.admin-invite-code=<YOUR_ADMIN_INVITE_CODE_HERE>
+
 # JWT Properties
 app.jwt.secret=<YOUR_RANDOM_32+_CHAR_SECRET_HERE>
 app.jwt.expiration-ms=86400000
+
+# Static resource cache control (helpful during frontend/module refactors)
+spring.web.resources.cache.cachecontrol.no-cache=true
+spring.web.resources.cache.cachecontrol.must-revalidate=true

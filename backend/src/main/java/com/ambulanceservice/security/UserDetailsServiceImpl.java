@@ -1,5 +1,6 @@
 package com.ambulanceservice.security;
 
+import com.ambulanceservice.user.entity.UserStatus;
 import com.ambulanceservice.user.entity.User;
 import com.ambulanceservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     return new org.springframework.security.core.userdetails.User(
         user.getEmail(),
         user.getPassword(),
-        user.isActive(),
+        user.getStatus() == UserStatus.ACTIVE,
         true, true, true,
         Collections.singletonList(new SimpleGrantedAuthority(user.getRole().name()))
     );

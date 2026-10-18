@@ -45,7 +45,7 @@ public class WhatsAppWebhookController {
     );
 
     // Created anonymously under WHATSAPP channel
-    BookingResponse response = bookingService.createBooking(bookingRequest, null);
+    BookingResponse response = bookingService.createBooking(bookingRequest, null, false);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 }

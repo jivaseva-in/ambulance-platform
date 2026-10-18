@@ -87,7 +87,10 @@ async function handleEmergencySubmit(e) {
 
     try {
         const data = await api.bookings.createEmergency(payload);
-        showAlert(`Ambulance Dispatched! Your Booking ID is #${data.id}`, 'success');
+        const sourceLabel = data.recordedByName
+            ? `recorded by ${data.recordedByName}`
+            : 'submitted directly by you';
+        showAlert(`Ambulance Dispatched! Your Booking ID is #${data.id} (${sourceLabel}).`, 'success');
 
         document.getElementById('trackBookingId').value = data.id;
         startLiveTracking(data.id, payload.pickupLatitude, payload.pickupLongitude);

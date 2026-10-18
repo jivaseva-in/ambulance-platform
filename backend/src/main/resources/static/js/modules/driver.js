@@ -115,6 +115,7 @@ export async function loadAvailableJobs() {
         }
 
         jobs.forEach(job => {
+            const assignedToMe = Boolean(job.driverId);
             const card = document.createElement('div');
             card.className = 'p-4 bg-slate-50 border rounded-lg flex justify-between items-center';
             card.innerHTML = `
@@ -122,9 +123,10 @@ export async function loadAvailableJobs() {
                   <div class="font-bold text-slate-800">#${job.id} - ${job.contactName} (${job.ambulanceType})</div>
                   <div class="text-xs text-slate-600">Pickup: ${job.pickupAddress}</div>
                   <div class="text-xs text-slate-500">Condition: ${job.patientCondition || 'Emergency'}</div>
+                  <div class="text-xs mt-1 ${assignedToMe ? 'text-blue-700 font-semibold' : 'text-slate-400'}">${assignedToMe ? 'Reserved for you by dispatch/admin' : 'Open queue - any available driver may accept'}</div>
                 </div>
                 <button data-accept-id="${job.id}" class="btn-accept bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded text-xs transition">
-                  Accept Trip
+                  ${assignedToMe ? 'Accept Assigned Trip' : 'Accept Trip'}
                 </button>
             `;
             container.appendChild(card);

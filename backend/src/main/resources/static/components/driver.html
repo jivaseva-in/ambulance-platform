@@ -78,7 +78,10 @@
     <!-- Driver Pending Job Queue -->
     <div id="driverControls" class="space-y-4">
         <div class="flex justify-between items-center">
-            <h3 class="font-bold text-slate-700">Available Emergency Dispatch Queue</h3>
+            <div>
+                <h3 class="font-bold text-slate-700">Available Emergency Dispatch Queue</h3>
+                <p class="text-xs text-slate-500">Includes both open requests and cases reserved specifically for you.</p>
+            </div>
             <button id="btnRefreshJobs" class="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded font-medium">Refresh Queue</button>
         </div>
         <div id="availableJobsList" class="space-y-3">

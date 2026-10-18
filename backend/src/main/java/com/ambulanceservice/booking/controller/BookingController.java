@@ -26,7 +26,7 @@ public class BookingController {
       @Valid @RequestBody CreateBookingRequest request,
       @AuthenticationPrincipal UserDetails userDetails) {
     String email = userDetails != null ? userDetails.getUsername() : null;
-    return ResponseEntity.status(HttpStatus.CREATED).body(bookingService.createBooking(request, email));
+    return ResponseEntity.status(HttpStatus.CREATED).body(bookingService.createBooking(request, email, true));
   }
 
   // 2. Track booking details by ID (PUBLIC: Allows patient/guest to monitor their assigned ambulance)
@@ -38,9 +38,10 @@ public class BookingController {
   // 3. Driver feeds: Get unassigned bookings waiting for dispatch (Protected: DRIVER or ADMIN)
   // Using hasRole('DRIVER') which checks for authority "ROLE_DRIVER"
   @GetMapping("/available")
-  @PreAuthorize("hasRole('DRIVER') or hasRole('ADMIN')")
-  public ResponseEntity<List<BookingResponse>> getAvailableBookings() {
-    return ResponseEntity.ok(bookingService.getAvailableBookings());
+  @PreAuthorize("hasRole('DRIVER')")
+  public ResponseEntity<List<BookingResponse>> getAvailableBookings(
+      @AuthenticationPrincipal UserDetails userDetails) {
+    return ResponseEntity.ok(bookingService.getAvailableBookings(userDetails.getUsername()));
   }
 
   // 4. View history for logged-in user (patient or driver)
@@ -51,7 +52,7 @@ public class BookingController {
 
   // 5. Admin fleet overview
   @GetMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
   public ResponseEntity<List<BookingResponse>> getAllBookings() {
     return ResponseEntity.ok(bookingService.getAllBookings());
   }
@@ -67,7 +68,7 @@ public class BookingController {
 
   // 7. Update status (ASSIGNED -> IN_TRANSIT -> ARRIVED -> COMPLETED / CANCELLED)
   @PutMapping("/{id}/status")
-  @PreAuthorize("hasRole('DRIVER') or hasRole('ADMIN')")
+  @PreAuthorize("hasRole('DRIVER')")
   public ResponseEntity<BookingResponse> updateStatus(
       @PathVariable Long id,
       @Valid @RequestBody UpdateBookingStatusRequest request,
@@ -76,7 +77,7 @@ public class BookingController {
   }
 
   @GetMapping("/driver/active")
-  @PreAuthorize("hasRole('DRIVER') or hasRole('ADMIN')")
+  @PreAuthorize("hasRole('DRIVER')")
   public ResponseEntity<BookingResponse> getActiveTrip(
       @AuthenticationPrincipal UserDetails userDetails) {
     return bookingService.getActiveTripForDriver(userDetails.getUsername())

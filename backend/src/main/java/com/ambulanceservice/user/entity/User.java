@@ -29,6 +29,9 @@ public class User {
   @Column(nullable = false, unique = true, length = 20)
   private String phone;
 
+  @Column(length = 255)
+  private String address;
+
   @Column(nullable = false)
   private String password;
 
@@ -36,8 +39,10 @@ public class User {
   @Column(nullable = false, length = 20)
   private Role role;
 
-  @Column(nullable = false)
-  private boolean active = true;
+  @Builder.Default
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private UserStatus status = UserStatus.PENDING;
 
   @CreationTimestamp
   @Column(updatable = false)
