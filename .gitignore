@@ -89,6 +89,7 @@ yarn-error.log*
 # Android & Mobile Artifacts (mobile-android/)
 # ==========================================
 .gradle/
+**/local.properties
 local.properties
 captures/
 .externalNativeBuild/
