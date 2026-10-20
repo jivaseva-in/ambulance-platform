@@ -1,0 +1,6 @@
+systemtest.base-url=http://localhost:8080
+systemtest.admin-email=alice.admin@example.com
+systemtest.admin-password=CHANGE_ME
+systemtest.test-user-prefix=DELETABLE_
+systemtest.timeout-ms=15000
+systemtest.cleanup-enabled=false

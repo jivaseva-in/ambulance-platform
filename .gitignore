@@ -22,6 +22,11 @@ application-local.properties
 application-secret.properties
 
 # ==========================================
+# System test local secrets
+# ==========================================
+systemtest/src/test/resources/systemtest.properties
+
+# ==========================================
 # Java & Maven Build Artifacts (Backend)
 # ==========================================
 target/
