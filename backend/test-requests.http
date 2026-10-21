@@ -8,6 +8,23 @@ Content-Type: application/json
 {
   "contactName": "John Doe",
   "contactPhone": "+1234567890",
+  "pickupAddress": "Poschim Sonatikari, North 24 Parganas, West Bengal 743249",
+  "destinationAddress": "Bongaon Super Speciality Hospital, Bongaon, West Bengal 743235",
+  "patientCondition": "Severe chest pain, conscious",
+  "ambulanceType": "ADVANCED_LIFE_SUPPORT",
+  "bookingChannel": "ONLINE_WEB"
+}
+
+### =========================================================================
+### STEP 1: ANONYMOUS GUEST EMERGENCY BOOKING (NO LOGIN / NO TOKEN)
+### =========================================================================
+# @name createBooking
+POST http://localhost:8080/api/v1/bookings
+Content-Type: application/json
+
+{
+  "contactName": "John Doe",
+  "contactPhone": "+1234567890",
   "pickupAddress": "452 Elm Street, Block B",
   "pickupLatitude": 12.9716,
   "pickupLongitude": 77.5946,
@@ -152,3 +169,45 @@ Content-Type: application/json
 ### STEP 12: PUBLIC PATIENT MAP VIEW (LIVE DRIVER GPS STREAM)
 ### =========================================================================
 GET http://localhost:8080/api/v1/bookings/{{bookingId}}/location
+
+### =========================================================================
+### INVALID COORDINATE EXAMPLE (EXPECTED API ERROR RESPONSE)
+### =========================================================================
+### This demonstrates the backend validation message the frontend should display
+### when a driver tries to set an invalid latitude/longitude.
+
+PUT http://localhost:8080/api/v1/drivers/me/availability
+Authorization: Bearer {{driverJwt}}
+Content-Type: application/json
+
+{
+  "availabilityStatus": "AVAILABLE",
+  "latitude": 999.0,
+  "longitude": -200.0
+}
+
+### Expected response:
+# HTTP/1.1 400 Bad Request
+# {
+#   "status": 400,
+#   "message": "Latitude and longitude are invalid for an available driver.",
+#   "timestamp": "2026-10-21T10:00:00"
+# }
+
+### Alternative invalid payload example:
+PUT http://localhost:8080/api/v1/drivers/me/location
+Authorization: Bearer {{driverJwt}}
+Content-Type: application/json
+
+{
+  "latitude": 91.0,
+  "longitude": 180.5
+}
+
+### Expected response:
+# HTTP/1.1 400 Bad Request
+# {
+#   "status": 400,
+#   "message": "Location coordinates are invalid.",
+#   "timestamp": "2026-10-21T10:00:00"
+# }

@@ -103,7 +103,11 @@ export const api = {
             request(`/dispatch/bookings/${bookingId}/unassign`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${state.dispatcherToken}` }
-            })
+            }),
+        getNearestDrivers: (pickupLatitude, pickupLongitude, destinationLatitude = pickupLatitude, destinationLongitude = pickupLongitude) =>
+            request(`/dispatch/drivers/nearest?pickupLatitude=${encodeURIComponent(pickupLatitude)}&pickupLongitude=${encodeURIComponent(pickupLongitude)}&destinationLatitude=${encodeURIComponent(destinationLatitude)}&destinationLongitude=${encodeURIComponent(destinationLongitude)}`, {
+                headers: { 'Authorization': `Bearer ${state.dispatcherToken}` }
+            }),
     },
     admin: {
         getPendingUsers: () =>
@@ -133,6 +137,24 @@ export const api = {
         getAllUsers: () =>
             request('/admin/users', {
                 headers: { 'Authorization': `Bearer ${state.adminToken}` }
+            })
+    },
+    drivers: {
+        getAvailability: () =>
+            request('/drivers/me/availability', {
+                headers: { 'Authorization': `Bearer ${state.driverToken}` }
+            }),
+        setAvailability: (availabilityStatus, latitude = null, longitude = null) =>
+            request('/drivers/me/availability', {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.driverToken}` },
+                body: JSON.stringify({ availabilityStatus, latitude, longitude })
+            }),
+        updateLocation: (latitude, longitude) =>
+            request('/drivers/me/location', {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.driverToken}` },
+                body: JSON.stringify({ latitude, longitude })
             })
     }
 };

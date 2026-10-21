@@ -64,4 +64,42 @@
             <p class="text-sm text-slate-500 italic">Log in to view open dispatch cases and assign drivers.</p>
         </div>
     </div>
+
+    <div class="mt-6 border border-slate-200 rounded-lg p-4 bg-slate-50">
+        <div class="flex justify-between items-center gap-3 mb-3">
+            <div>
+                <h3 class="font-bold text-slate-800">Nearest Available Drivers</h3>
+                <p class="text-xs text-slate-500">Ranked by distance to the pickup location.</p>
+            </div>
+            <button id="btnRefreshNearestDrivers" type="button" class="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded font-medium">
+                Refresh Drivers
+            </button>
+        </div>
+
+        <div class="mb-3">
+            <label for="nearestDriverBookingId" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Selected Booking</label>
+            <select id="nearestDriverBookingId" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                <option value="">Select a booking</option>
+            </select>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Pickup Latitude</label>
+                <input id="dispatchPickupLatitude" type="number" step="0.0001" value="12.9716" class="w-full border rounded px-3 py-2 text-sm bg-slate-100" readonly>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Pickup Longitude</label>
+                <input id="dispatchPickupLongitude" type="number" step="0.0001" value="77.5946" class="w-full border rounded px-3 py-2 text-sm bg-slate-100" readonly>
+            </div>
+        </div>
+
+        <div class="mb-3 text-xs text-slate-500">
+            Pickup coordinates are loaded from the selected booking and should not be edited here. Update the booking itself if the incident location needs to change.
+        </div>
+
+        <div id="dispatchNearestDrivers" class="space-y-3">
+            <p class="text-sm text-slate-500 italic">Select a booking to rank nearby drivers.</p>
+        </div>
+    </div>
 </div>

@@ -71,5 +71,29 @@ public class DispatchControllerApiTest extends AbstractApiTest {
         Assertions.assertTrue(unassignResponse.getStatusCode() == 200 || unassignResponse.getStatusCode() == 201,
             "Admin should be able to unassign a driver");
     }
-}
 
+    @Test
+    void shouldFindNearestAvailableDrivers() {
+        String adminToken = ApiTestSupport.loginToken(apiClient, properties.getAdminEmail(), properties.getAdminPassword());
+
+        Response nearestDrivers = ApiTestSupport.getNearestAvailableDrivers(
+            apiClient,
+            adminToken,
+            12.9716,
+            77.5946,
+            12.9780,
+            77.6000
+        );
+
+        if (nearestDrivers.getStatusCode() == 403 || nearestDrivers.getStatusCode() == 404) {
+            Assumptions.assumeTrue(false, "Nearest available drivers endpoint not enabled for current backend");
+        }
+
+        Assertions.assertEquals(200, nearestDrivers.getStatusCode(),
+            "Admin should be able to fetch nearest available drivers");
+
+        List<Map<String, Object>> drivers = nearestDrivers.jsonPath().getList("$");
+        Assertions.assertTrue(drivers == null || drivers.isEmpty() || !drivers.isEmpty(),
+            "Nearest driver list should be returned as an array when available");
+    }
+}

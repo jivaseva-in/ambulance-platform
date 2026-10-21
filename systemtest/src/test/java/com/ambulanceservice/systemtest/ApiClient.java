@@ -4,6 +4,8 @@ import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 
+import java.util.Map;
+
 public class ApiClient {
 
     private final String baseUrl;
@@ -56,6 +58,17 @@ public class ApiClient {
             .response();
     }
 
+    public Response getWithAuthAndQuery(String path, String bearerToken, Map<String, ?> queryParams) {
+        return RestAssured.given()
+            .header("Authorization", "Bearer " + bearerToken)
+            .queryParams(queryParams)
+            .when()
+            .get(baseUrl + path)
+            .then()
+            .extract()
+            .response();
+    }
+
     public Response putJsonWithAuth(String path, Object body, String bearerToken) {
         return RestAssured.given()
             .contentType(ContentType.JSON)
@@ -68,4 +81,3 @@ public class ApiClient {
             .response();
     }
 }
-

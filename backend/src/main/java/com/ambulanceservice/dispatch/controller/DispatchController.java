@@ -7,7 +7,11 @@ import com.ambulanceservice.booking.dto.CreateBookingRequest;
 import com.ambulanceservice.dispatch.dto.AssignDriverRequest;
 import com.ambulanceservice.dispatch.dto.AvailableDriverResponse;
 import com.ambulanceservice.dispatch.dto.PhoneBookingRequest;
+import com.ambulanceservice.dispatch.service.DriverDispatchService;
+import com.ambulanceservice.dispatch.dto.DispatchDriverCandidateResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,12 +22,16 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import org.springframework.validation.annotation.Validated;
+
+@Validated
 @RestController
 @RequestMapping("/api/v1/dispatch")
 @RequiredArgsConstructor
 public class DispatchController {
 
   private final BookingService bookingService;
+  private final DriverDispatchService driverDispatchService;
 
   @PostMapping("/phone-call")
   @PreAuthorize("hasAnyRole('DISPATCHER', 'ADMIN', 'SUPER_ADMIN')")
@@ -36,11 +44,11 @@ public class DispatchController {
         request.callerName(),
         request.callerPhone(),
         request.pickupAddress(),
-        request.pickupLatitude() != null ? request.pickupLatitude() : 0.0,
-        request.pickupLongitude() != null ? request.pickupLongitude() : 0.0,
+        request.pickupLatitude(),
+        request.pickupLongitude(),
         request.destinationHospital() != null ? request.destinationHospital() : "Nearest General Hospital",
-        request.destinationLatitude() != null ? request.destinationLatitude() : 0.0,
-        request.destinationLongitude() != null ? request.destinationLongitude() : 0.0,
+        request.destinationLatitude(),
+        request.destinationLongitude(),
         "[Phone Call Dispatch: " + dispatcher.getUsername() + "] " + request.triageNotes()
             + (request.dispatcherInternalNotes() != null ? " | Notes: " + request.dispatcherInternalNotes() : ""),
         request.ambulanceType(),
@@ -78,5 +86,24 @@ public class DispatchController {
       @PathVariable Long bookingId,
       @AuthenticationPrincipal UserDetails dispatcher) {
     return ResponseEntity.ok(bookingService.unassignDriver(bookingId, dispatcher.getUsername()));
+  }
+
+  @GetMapping("/drivers/nearest")
+  @PreAuthorize("hasAnyRole('DISPATCHER', 'ADMIN', 'SUPER_ADMIN')")
+  public ResponseEntity<List<DispatchDriverCandidateResponse>> getNearestAvailableDrivers(
+      @RequestParam @DecimalMin(value = "-90.0", inclusive = true, message = "Pickup latitude must be between -90 and 90")
+      @DecimalMax(value = "90.0", inclusive = true, message = "Pickup latitude must be between -90 and 90") Double pickupLatitude,
+      @RequestParam @DecimalMin(value = "-180.0", inclusive = true, message = "Pickup longitude must be between -180 and 180")
+      @DecimalMax(value = "180.0", inclusive = true, message = "Pickup longitude must be between -180 and 180") Double pickupLongitude,
+      @RequestParam @DecimalMin(value = "-90.0", inclusive = true, message = "Destination latitude must be between -90 and 90")
+      @DecimalMax(value = "90.0", inclusive = true, message = "Destination latitude must be between -90 and 90") Double destinationLatitude,
+      @RequestParam @DecimalMin(value = "-180.0", inclusive = true, message = "Destination longitude must be between -180 and 180")
+      @DecimalMax(value = "180.0", inclusive = true, message = "Destination longitude must be between -180 and 180") Double destinationLongitude) {
+    return ResponseEntity.ok(driverDispatchService.getNearestAvailableDrivers(
+        pickupLatitude,
+        pickupLongitude,
+        destinationLatitude,
+        destinationLongitude
+    ));
   }
 }

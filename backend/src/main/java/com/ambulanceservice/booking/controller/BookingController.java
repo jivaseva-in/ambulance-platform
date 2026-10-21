@@ -35,6 +35,12 @@ public class BookingController {
     return ResponseEntity.ok(bookingService.getBookingById(id));
   }
 
+  // 2a. Track booking details by phone number (PUBLIC: Allows patient/guest to monitor by contact phone)
+  @GetMapping("/phone/{phoneNumber}")
+  public ResponseEntity<BookingResponse> getBookingByPhone(@PathVariable String phoneNumber) {
+    return ResponseEntity.ok(bookingService.getBookingByPhone(phoneNumber));
+  }
+
   // 3. Driver feeds: Get unassigned bookings waiting for dispatch (Protected: DRIVER or ADMIN)
   // Using hasRole('DRIVER') which checks for authority "ROLE_DRIVER"
   @GetMapping("/available")

@@ -7,6 +7,7 @@ import { showAlert } from '../ui.js';
 
 let dispatchAssignmentList;
 let availableDrivers = [];
+let driverCandidates = [];
 
 function updateDispatcherAuthUI() {
     const authBadge = document.getElementById('dispatcherAuthBadge');
@@ -99,6 +100,7 @@ async function refreshDispatchAssignmentPanel() {
         ]);
         availableDrivers = drivers;
         renderDispatchQueue(bookings);
+        syncBookingSelectorWithQueue(bookings);
     } catch (err) {
         showAlert('Failed to load dispatch assignment data: ' + err.message, 'error');
     }
@@ -166,6 +168,171 @@ async function handlePhoneDispatchSubmit(e) {
     }
 }
 
+async function setNearestDriverReferenceFromBooking(booking) {
+    const latInput = document.getElementById('dispatchPickupLatitude');
+    const lonInput = document.getElementById('dispatchPickupLongitude');
+    if (!latInput || !lonInput || !booking) return;
+
+    const pickupLatitude = booking.pickupLatitude ?? null;
+    const pickupLongitude = booking.pickupLongitude ?? null;
+
+    latInput.value = pickupLatitude ?? '';
+    lonInput.value = pickupLongitude ?? '';
+    latInput.readOnly = true;
+    lonInput.readOnly = true;
+    latInput.classList.add('bg-slate-100');
+    lonInput.classList.add('bg-slate-100');
+}
+
+async function refreshNearestDriversForSelectedBooking() {
+    const bookingId = document.getElementById('nearestDriverBookingId')?.value;
+    if (!bookingId) {
+        const candidateContainer = document.getElementById('dispatchNearestDrivers');
+        if (candidateContainer) {
+            candidateContainer.innerHTML = '<p class="text-sm text-slate-500 italic">Select a booking to rank nearby drivers.</p>';
+        }
+        return;
+    }
+
+    try {
+        const bookings = await api.dispatch.getOpenBookings();
+        const selectedBooking = bookings.find(booking => String(booking.id) === String(bookingId));
+        if (!selectedBooking) {
+            throw new Error('Selected booking not found.');
+        }
+
+        setNearestDriverReferenceFromBooking(selectedBooking);
+
+        const pickupLatitude = Number(selectedBooking.pickupLatitude ?? 0);
+        const pickupLongitude = Number(selectedBooking.pickupLongitude ?? 0);
+
+        if (!pickupLatitude || !pickupLongitude) {
+            const candidateContainer = document.getElementById('dispatchNearestDrivers');
+            if (candidateContainer) {
+                candidateContainer.innerHTML = '<p class="text-sm text-slate-500 italic">Selected booking has no valid pickup coordinates.</p>';
+            }
+            return;
+        }
+
+        driverCandidates = await api.dispatch.getNearestDrivers(
+            pickupLatitude,
+            pickupLongitude,
+            pickupLatitude,
+            pickupLongitude
+        );
+        renderNearestDriverCandidates(driverCandidates);
+    } catch (err) {
+        showAlert('Failed to load nearest available drivers for the selected booking: ' + err.message, 'error');
+    }
+}
+
+async function refreshNearestDrivers() {
+    if (!state.dispatcherToken) return;
+
+    const bookingId = document.getElementById('nearestDriverBookingId')?.value;
+    if (bookingId) {
+        await refreshNearestDriversForSelectedBooking();
+        return;
+    }
+
+    const pickupLatitude = Number(document.getElementById('dispatchPickupLatitude')?.value || 0);
+    const pickupLongitude = Number(document.getElementById('dispatchPickupLongitude')?.value || 0);
+
+    if (!pickupLatitude || !pickupLongitude) {
+        const candidateContainer = document.getElementById('dispatchNearestDrivers');
+        if (candidateContainer) {
+            candidateContainer.innerHTML = '<p class="text-sm text-slate-500 italic">Select a booking to rank nearby drivers.</p>';
+        }
+        return;
+    }
+
+    try {
+        driverCandidates = await api.dispatch.getNearestDrivers(pickupLatitude, pickupLongitude, pickupLatitude, pickupLongitude);
+        renderNearestDriverCandidates(driverCandidates);
+    } catch (err) {
+        showAlert('Failed to load nearest available drivers: ' + err.message, 'error');
+    }
+}
+
+function renderNearestDriverCandidates(candidates) {
+    const candidateContainer = document.getElementById('dispatchNearestDrivers');
+    if (!candidateContainer) return;
+
+    if (!candidates.length) {
+        candidateContainer.innerHTML = '<p class="text-sm text-slate-500 italic">No nearby available drivers yet.</p>';
+        return;
+    }
+
+    candidateContainer.innerHTML = candidates.map((driver, index) => `
+        <div class="border border-slate-200 rounded-lg p-3 bg-slate-50">
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">${index + 1}</span>
+                    <strong class="text-slate-800">${driver.fullName}</strong>
+                </div>
+                <span class="text-xs font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700">${driver.availabilityStatus}</span>
+            </div>
+            <div class="text-xs text-slate-600 space-y-1">
+                <div><span class="font-medium">Distance:</span> ${Number(driver.distanceKm || 0).toFixed(1)} km</div>
+                <div><span class="font-medium">Phone:</span> ${driver.phone || 'N/A'}</div>
+                <div><span class="font-medium">Last seen:</span> ${driver.lastLocationUpdate ? new Date(driver.lastLocationUpdate).toLocaleString() : 'N/A'}</div>
+                <div><span class="font-medium">Address:</span> ${driver.address || 'N/A'}</div>
+            </div>
+            <div class="mt-3 flex gap-2">
+                <button type="button" data-driver-id="${driver.id}" class="dispatch-select-nearest-driver-btn bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded text-xs font-semibold transition">
+                    Select Driver
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function handleSelectNearestDriverClick(button) {
+    const driverId = Number(button.dataset.driverId);
+    const bookingId = document.getElementById('nearestDriverBookingId')?.value;
+
+    if (!bookingId) {
+        showAlert('Please select or open a booking before assigning a ranked driver.', 'info');
+        return;
+    }
+
+    try {
+        const updated = await api.dispatch.assignDriver(Number(bookingId), driverId);
+        showAlert(`Booking #${bookingId} reserved for ${updated.driverName || 'selected driver'}.`, 'success');
+        await refreshDispatchAssignmentPanel();
+        await refreshNearestDrivers();
+    } catch (err) {
+        showAlert('Failed to assign the selected nearby driver: ' + err.message, 'error');
+    }
+}
+
+function syncBookingSelectorWithQueue(bookings) {
+    const bookingSelect = document.getElementById('nearestDriverBookingId');
+    if (!bookingSelect) return;
+
+    const currentValue = bookingSelect.value;
+    bookingSelect.innerHTML = '<option value="">Select a booking</option>' + bookings.map(booking => `
+        <option value="${booking.id}">${booking.id} - ${booking.contactName}</option>
+    `).join('');
+
+    if (currentValue && bookings.some(booking => String(booking.id) === String(currentValue))) {
+        bookingSelect.value = currentValue;
+    }
+
+    const selectedBooking = bookings.find(booking => String(booking.id) === String(bookingSelect.value));
+    const latInput = document.getElementById('dispatchPickupLatitude');
+    const lonInput = document.getElementById('dispatchPickupLongitude');
+
+    if (selectedBooking) {
+        setNearestDriverReferenceFromBooking(selectedBooking);
+    } else if (latInput && lonInput) {
+        latInput.readOnly = true;
+        lonInput.readOnly = true;
+        latInput.classList.add('bg-slate-100');
+        lonInput.classList.add('bg-slate-100');
+    }
+}
+
 export function initDispatcherModule() {
     dispatchAssignmentList = document.getElementById('dispatchAssignmentList');
     updateDispatcherAuthUI();
@@ -197,12 +364,20 @@ export function initDispatcherModule() {
 
     document.getElementById('phoneDispatchForm')?.addEventListener('submit', handlePhoneDispatchSubmit);
     document.getElementById('btnRefreshDispatchAssignments')?.addEventListener('click', refreshDispatchAssignmentPanel);
+    document.getElementById('btnRefreshNearestDrivers')?.addEventListener('click', refreshNearestDrivers);
+    document.getElementById('nearestDriverBookingId')?.addEventListener('change', refreshNearestDriversForSelectedBooking);
     dispatchAssignmentList?.addEventListener('click', (e) => {
         if (e.target && e.target.classList.contains('dispatch-assign-btn')) {
             handleAssignDriverClick(e.target);
         }
         if (e.target && e.target.classList.contains('dispatch-unassign-btn')) {
             handleUnassignDriverClick(e.target);
+        }
+    });
+
+    document.getElementById('dispatchNearestDrivers')?.addEventListener('click', (e) => {
+        if (e.target && e.target.classList.contains('dispatch-select-nearest-driver-btn')) {
+            handleSelectNearestDriverClick(e.target);
         }
     });
 

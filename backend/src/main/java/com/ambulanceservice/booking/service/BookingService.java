@@ -13,6 +13,8 @@ import com.ambulanceservice.user.entity.Role;
 import com.ambulanceservice.user.entity.User;
 import com.ambulanceservice.user.entity.UserStatus;
 import com.ambulanceservice.user.repository.UserRepository;
+import com.ambulanceservice.common.GeoCodingService;
+import com.ambulanceservice.common.GeoCodingService.GeoPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,9 +31,21 @@ public class BookingService {
 
   private final BookingRepository bookingRepository;
   private final UserRepository userRepository;
+  private final GeoCodingService geoCodingService;
 
   @Transactional
   public BookingResponse createBooking(CreateBookingRequest request, String currentUserEmail, boolean attachAsRequester) {
+    CoordinatePair pickup = resolveCoordinates(
+        request.pickupLatitude(),
+        request.pickupLongitude(),
+        request.pickupAddress(),
+        "Pickup");
+    CoordinatePair destination = resolveCoordinates(
+        request.destinationLatitude(),
+        request.destinationLongitude(),
+        request.destinationAddress(),
+        "Destination");
+
     User currentUser = null;
     // If an authenticated user is involved, link their account either as the requester or as the staff recorder.
     if (currentUserEmail != null) {
@@ -42,11 +56,11 @@ public class BookingService {
         .contactName(request.contactName())
         .contactPhone(request.contactPhone())
         .pickupAddress(request.pickupAddress())
-        .pickupLatitude(request.pickupLatitude())
-        .pickupLongitude(request.pickupLongitude())
+        .pickupLatitude(pickup.latitude())
+        .pickupLongitude(pickup.longitude())
         .destinationAddress(request.destinationAddress())
-        .destinationLatitude(request.destinationLatitude())
-        .destinationLongitude(request.destinationLongitude())
+        .destinationLatitude(destination.latitude())
+        .destinationLongitude(destination.longitude())
         .patientCondition(request.patientCondition())
         .ambulanceType(request.ambulanceType())
         .bookingChannel(request.bookingChannel())
@@ -56,6 +70,43 @@ public class BookingService {
         .build();
 
     return BookingResponse.fromEntity(bookingRepository.save(booking));
+  }
+
+  private CoordinatePair resolveCoordinates(Double latitude, Double longitude, String address, String label) {
+    if (latitude != null || longitude != null) {
+      if (latitude == null || longitude == null) {
+        throw new IllegalArgumentException(label + " latitude and longitude must both be provided together.");
+      }
+      validateCoordinates(latitude, longitude, label + " coordinates are invalid.");
+      return new CoordinatePair(latitude, longitude);
+    }
+
+    if (address == null || address.isBlank()) {
+      throw new IllegalArgumentException(label + " address is required when no coordinates are supplied.");
+    }
+
+    GeoPoint geoPoint = geoCodingService.geocode(address).orElse(null);
+    if (geoPoint == null) {
+      return new CoordinatePair(null, null);
+    }
+
+    validateCoordinates(geoPoint.latitude(), geoPoint.longitude(), label + " resolved coordinates are invalid.");
+    return new CoordinatePair(geoPoint.latitude(), geoPoint.longitude());
+  }
+
+  private record CoordinatePair(Double latitude, Double longitude) {
+  }
+
+  private void validateCoordinates(Double latitude, Double longitude, String message) {
+    if (latitude == null || longitude == null) {
+      throw new IllegalArgumentException(message);
+    }
+    if (latitude.isNaN() || longitude.isNaN() || latitude.isInfinite() || longitude.isInfinite()) {
+      throw new IllegalArgumentException(message);
+    }
+    if (latitude < -90.0 || latitude > 90.0 || longitude < -180.0 || longitude > 180.0) {
+      throw new IllegalArgumentException(message);
+    }
   }
 
   public BookingResponse getBookingById(Long id) {
@@ -205,6 +256,32 @@ public class BookingService {
     }
 
     return BookingResponse.fromEntity(bookingRepository.save(booking));
+  }
+
+  public BookingResponse getBookingByPhone(String phoneNumber) {
+    String normalized = normalizePhone(phoneNumber);
+    if (normalized == null || normalized.isBlank()) {
+      throw new IllegalArgumentException("Phone number is required");
+    }
+
+    List<Booking> matches = bookingRepository.findByContactPhoneContainingOrderByCreatedAtDesc(normalized);
+    if (matches.isEmpty()) {
+      throw new ResourceNotFoundException("No booking found for phone number: " + phoneNumber);
+    }
+
+    return BookingResponse.fromEntity(matches.get(0));
+  }
+
+  private String normalizePhone(String phoneNumber) {
+    if (phoneNumber == null) {
+      return null;
+    }
+
+    String digits = phoneNumber.replaceAll("[^0-9]", "");
+    if (digits.isBlank()) {
+      return null;
+    }
+    return digits;
   }
 
   private User getUserByEmail(String email) {

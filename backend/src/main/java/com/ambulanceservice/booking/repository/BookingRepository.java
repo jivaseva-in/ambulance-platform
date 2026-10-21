@@ -16,6 +16,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
   List<Booking> findByRecordedByIdOrderByCreatedAtDesc(Long recordedById);
   List<Booking> findByAssignedDriverIdOrderByCreatedAtDesc(Long driverId);
   List<Booking> findByStatusAndAssignedDriverIdOrderByCreatedAtDesc(BookingStatus status, Long driverId);
+  List<Booking> findByContactPhoneContainingOrderByCreatedAtDesc(String phoneFragment);
 
   // Active trip query for assigned driver using ASSIGNED, IN_TRANSIT, and ARRIVED
   @Query("SELECT b FROM Booking b WHERE b.assignedDriver.email = :driverEmail " +

@@ -7,6 +7,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+import com.ambulanceservice.user.entity.DriverAvailabilityStatus;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -43,6 +45,20 @@ public class User {
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 20)
   private UserStatus status = UserStatus.PENDING;
+
+  @Builder.Default
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private DriverAvailabilityStatus availabilityStatus = DriverAvailabilityStatus.UNAVAILABLE;
+
+  @Column
+  private Double latitude;
+
+  @Column
+  private Double longitude;
+
+  @Column
+  private LocalDateTime lastLocationUpdate;
 
   @CreationTimestamp
   @Column(updatable = false)

@@ -8,12 +8,16 @@ public final class TestDataCleanup {
     }
 
     public static String prefixedEmail(String label) {
-        return "DELETABLE_" + sanitize(label) + "_" + shortUuid() + "@example.test";
+        return configuredPrefix() + sanitize(label) + "_" + shortUuid() + "@example.test";
     }
 
     public static String prefixedFullName(String label) {
         String base = sanitizeForDisplay(label);
-        return "DELETABLE_" + base + "_" + shortUuid();
+        return configuredPrefix() + base + "_" + shortUuid();
+    }
+
+    private static String configuredPrefix() {
+        return SystemTestProperties.load().getTestUserPrefix();
     }
 
     public static String prefixedPhone(String suffix) {

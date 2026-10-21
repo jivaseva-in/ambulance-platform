@@ -86,6 +86,25 @@ public final class ApiTestSupport {
         return apiClient.putJsonWithAuth("/api/v1/bookings/" + bookingId + "/accept", payload, driverToken);
     }
 
+    public static Response setDriverAvailability(ApiClient apiClient, String driverToken, String availabilityStatus, Double latitude, Double longitude) {
+        Map<String, Object> payload = ApiTestDataFactory.driverAvailabilityRequest(availabilityStatus, latitude, longitude);
+        return apiClient.putJsonWithAuth("/api/v1/drivers/me/availability", payload, driverToken);
+    }
+
+    public static Response updateDriverLocation(ApiClient apiClient, String driverToken, double latitude, double longitude) {
+        Map<String, Object> payload = ApiTestDataFactory.driverLocationUpdateRequest(latitude, longitude);
+        return apiClient.putJsonWithAuth("/api/v1/drivers/me/location", payload, driverToken);
+    }
+
+    public static Response getNearestAvailableDrivers(ApiClient apiClient, String adminToken,
+                                                     double pickupLatitude, double pickupLongitude,
+                                                     double destinationLatitude, double destinationLongitude) {
+        Map<String, Object> query = ApiTestDataFactory.nearestDriverQuery(
+            pickupLatitude, pickupLongitude, destinationLatitude, destinationLongitude
+        );
+        return apiClient.getWithAuthAndQuery("/api/v1/dispatch/drivers/nearest", adminToken, query);
+    }
+
     public static void assertSuccess(Response response, String message) {
         int status = response.getStatusCode();
         Assertions.assertTrue(status == 200 || status == 201 || status == 204, message + " [status=" + status + "]");

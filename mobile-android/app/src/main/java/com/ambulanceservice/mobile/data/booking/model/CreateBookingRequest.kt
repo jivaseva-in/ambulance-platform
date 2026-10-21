@@ -13,4 +13,3 @@ data class CreateBookingRequest(
     val ambulanceType: AmbulanceType,
     val bookingChannel: BookingChannel
 )
-

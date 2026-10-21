@@ -12,6 +12,8 @@ export function initDriverModule() {
     document.getElementById('btnDriverLogout')?.addEventListener('click', handleDriverLogout);
     document.getElementById('btnRefreshJobs')?.addEventListener('click', loadAvailableJobs);
     document.getElementById('btnSyncActiveTrip')?.addEventListener('click', syncActiveTripFromBackend);
+    document.getElementById('btnToggleAvailability')?.addEventListener('click', handleToggleAvailability);
+    document.getElementById('btnRefreshDriverLocation')?.addEventListener('click', handleRefreshLocation);
 
     // Lifecycle transition buttons
     document.getElementById('btnSetInTransit')?.addEventListener('click', () => handleStatusChange('IN_TRANSIT'));
@@ -20,8 +22,11 @@ export function initDriverModule() {
     document.getElementById('btnSetCancelled')?.addEventListener('click', () => handleStatusChange('CANCELLED'));
     document.getElementById('btnPushGpsTelemetry')?.addEventListener('click', handlePushGps);
 
-    if (state.driverActiveTrip) {
-        updateDriverStatusCard(state.driverActiveTrip);
+    if (state.driverToken) {
+        loadDriverAvailability();
+        if (state.driverActiveTrip) {
+            updateDriverStatusCard(state.driverActiveTrip);
+        }
     }
 }
 
@@ -34,10 +39,13 @@ export function updateDriverAuthUI() {
         authBadge.textContent = `Logged in as: ${state.driverName || 'Driver'}`;
         logoutBtn.classList.remove('hidden');
         loginBox.classList.add('hidden');
+        loadDriverAvailability();
     } else {
         authBadge.textContent = 'Not Logged In';
         logoutBtn.classList.add('hidden');
         loginBox.classList.remove('hidden');
+        driverAvailability = null;
+        renderDriverAvailability({ availabilityStatus: 'UNAVAILABLE', latitude: null, longitude: null });
         document.getElementById('availableJobsList').innerHTML = '<p class="text-sm text-slate-500 italic">Please log in to view pending emergency requests.</p>';
     }
 }
@@ -186,5 +194,101 @@ async function handlePushGps() {
         showAlert(`GPS Telemetry broadcasted (${speed.toFixed(1)} km/h) for Booking #${bookingId}`, 'info');
     } catch (err) {
         console.error('Failed to send GPS telemetry:', err);
+    }
+}
+
+let driverAvailability = null;
+
+async function loadDriverAvailability() {
+    if (!state.driverToken) return;
+    try {
+        driverAvailability = await api.drivers.getAvailability();
+        renderDriverAvailability(driverAvailability);
+    } catch (err) {
+        console.error('Failed to load driver availability:', err);
+    }
+}
+
+function renderDriverAvailability(data) {
+    const statusBadge = document.getElementById('driverAvailabilityBadge');
+    const locationOut = document.getElementById('driverLocationSummary');
+    const toggleBtn = document.getElementById('btnToggleAvailability');
+    const locationInputs = {
+        lat: document.getElementById('driverAvailabilityLatitude'),
+        lon: document.getElementById('driverAvailabilityLongitude')
+    };
+
+    if (!statusBadge || !locationOut || !toggleBtn) return;
+
+    const available = data?.availabilityStatus === 'AVAILABLE';
+    statusBadge.textContent = available ? 'AVAILABLE' : 'UNAVAILABLE';
+    statusBadge.className = `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${available ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`;
+    locationOut.textContent = data?.latitude != null && data?.longitude != null
+        ? `${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}`
+        : 'No live location';
+    toggleBtn.textContent = available ? 'Set Unavailable' : 'Set Available';
+    toggleBtn.className = `font-bold px-4 py-2 rounded text-sm transition ${available ? 'bg-slate-700 hover:bg-slate-800 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`;
+
+    if (locationInputs.lat && locationInputs.lon) {
+        if (data?.latitude != null) locationInputs.lat.value = data.latitude;
+        if (data?.longitude != null) locationInputs.lon.value = data.longitude;
+    }
+}
+
+async function handleToggleAvailability() {
+    if (!state.driverToken) return showAlert('Please log in as Driver first.', 'error');
+
+    const currentStatus = driverAvailability?.availabilityStatus || 'UNAVAILABLE';
+    const nextStatus = currentStatus === 'AVAILABLE' ? 'UNAVAILABLE' : 'AVAILABLE';
+    const latValue = Number(document.getElementById('driverAvailabilityLatitude')?.value ?? 0);
+    const lonValue = Number(document.getElementById('driverAvailabilityLongitude')?.value ?? 0);
+
+    try {
+        const result = await api.drivers.setAvailability(
+            nextStatus,
+            nextStatus === 'AVAILABLE' ? latValue : null,
+            nextStatus === 'AVAILABLE' ? lonValue : null
+        );
+        driverAvailability = result;
+        renderDriverAvailability(result);
+        showAlert(`Driver status updated to ${result.availabilityStatus}.`, 'success');
+    } catch (err) {
+        showAlert('Failed to update availability: ' + err.message, 'error');
+    }
+}
+
+async function handleRefreshLocation() {
+    if (!state.driverToken) return showAlert('Please log in as Driver first.', 'error');
+
+    const currentStatus = driverAvailability?.availabilityStatus || 'UNAVAILABLE';
+    if (currentStatus !== 'AVAILABLE') {
+        showAlert('You must mark yourself available before refreshing your location.', 'error');
+        return;
+    }
+
+    const latValue = Number(document.getElementById('driverAvailabilityLatitude')?.value ?? 0);
+    const lonValue = Number(document.getElementById('driverAvailabilityLongitude')?.value ?? 0);
+
+    if (!latValue || !lonValue) {
+        showAlert('Please enter both latitude and longitude before refreshing your location.', 'error');
+        return;
+    }
+
+    try {
+        const result = await api.drivers.updateLocation(latValue, lonValue);
+        driverAvailability = result ?? driverAvailability;
+        if (driverAvailability) {
+            driverAvailability.latitude = latValue;
+            driverAvailability.longitude = lonValue;
+            driverAvailability.lastLocationUpdate = new Date().toISOString();
+        }
+        renderDriverAvailability(driverAvailability || {
+            availabilityStatus: 'UNAVAILABLE',
+            latitude: latValue,
+            longitude: lonValue
+        });
+        showAlert('Location refreshed successfully.', 'success');
+    } catch (err) {
+        showAlert('Failed to refresh location: ' + err.message, 'error');
     }
 }

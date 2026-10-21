@@ -2,6 +2,8 @@ package com.ambulanceservice.mobile.data.booking.network
 
 import com.ambulanceservice.mobile.BuildConfig
 import com.ambulanceservice.mobile.config.AppEnvironment
+import com.google.gson.GsonBuilder
+import com.ambulanceservice.mobile.data.booking.model.LocalDateTimeAdapter
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -26,7 +28,13 @@ object ApiClient {
         Retrofit.Builder()
             .baseUrl(AppEnvironment.baseUrl)
             .client(httpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(
+                GsonConverterFactory.create(
+                    GsonBuilder()
+                        .registerTypeAdapter(java.time.LocalDateTime::class.java, LocalDateTimeAdapter())
+                        .create()
+                )
+            )
             .build()
     }
 

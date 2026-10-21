@@ -48,6 +48,35 @@ public final class ApiTestDataFactory {
         return request;
     }
 
+    public static Map<String, Object> driverLocationUpdateRequest(double latitude, double longitude) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("latitude", latitude);
+        request.put("longitude", longitude);
+        return request;
+    }
+
+    public static Map<String, Object> driverAvailabilityRequest(String availabilityStatus, Double latitude, Double longitude) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("availabilityStatus", availabilityStatus);
+        if (latitude != null) {
+            request.put("latitude", latitude);
+        }
+        if (longitude != null) {
+            request.put("longitude", longitude);
+        }
+        return request;
+    }
+
+    public static Map<String, Object> nearestDriverQuery(double pickupLatitude, double pickupLongitude,
+                                                        double destinationLatitude, double destinationLongitude) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put("pickupLatitude", pickupLatitude);
+        query.put("pickupLongitude", pickupLongitude);
+        query.put("destinationLatitude", destinationLatitude);
+        query.put("destinationLongitude", destinationLongitude);
+        return query;
+    }
+
     public static Map<String, Object> locationUpdateRequest(double latitude, double longitude) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("latitude", latitude);

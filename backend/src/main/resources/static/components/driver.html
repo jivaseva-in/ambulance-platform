@@ -88,4 +88,41 @@
             <p class="text-sm text-slate-500 italic">Please log in to view pending emergency requests.</p>
         </div>
     </div>
+
+    <!-- Driver Availability Controls -->
+    <div id="driverAvailabilitySection" class="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl mb-6 space-y-4">
+        <div class="flex flex-wrap justify-between items-center gap-3">
+            <div>
+                <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                    <span>📍</span> Availability & Location
+                </h3>
+                <p class="text-xs text-slate-500">Set your dispatch status and current coordinates so admin/dispatch can see you when available.</p>
+            </div>
+            <span id="driverAvailabilityBadge" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700">UNAVAILABLE</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Latitude</label>
+                <input id="driverAvailabilityLatitude" type="number" step="0.0001" placeholder="12.9716" class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Longitude</label>
+                <input id="driverAvailabilityLongitude" type="number" step="0.0001" placeholder="77.5946" class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Current location</label>
+                <div id="driverLocationSummary" class="text-sm font-medium text-slate-700 mt-2">No live location</div>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <button id="btnToggleAvailability" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded text-sm transition">
+                Set Available
+            </button>
+            <button id="btnRefreshDriverLocation" type="button" class="bg-slate-700 hover:bg-slate-800 text-white font-medium px-4 py-2 rounded text-sm transition">
+                Refresh Location
+            </button>
+        </div>
+    </div>
 </div>

@@ -23,3 +23,13 @@ app.jwt.expiration-ms=86400000
 # Static resource cache control (helpful during frontend/module refactors)
 spring.web.resources.cache.cachecontrol.no-cache=true
 spring.web.resources.cache.cachecontrol.must-revalidate=true
+
+# Driver availability settings
+app.driver.availability.max-stale-minutes=1440
+
+# HTTP proxy for outbound geocoding / internet calls
+app.http.proxy.enabled=false
+app.http.proxy.host=
+app.http.proxy.port=8080
+app.http.proxy.username=
+app.http.proxy.password=

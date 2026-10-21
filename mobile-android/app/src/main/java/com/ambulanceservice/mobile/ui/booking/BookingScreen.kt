@@ -41,6 +41,7 @@ import com.ambulanceservice.mobile.config.AppEnvironment
 import com.ambulanceservice.mobile.data.booking.model.AmbulanceType
 import com.ambulanceservice.mobile.data.booking.model.BookingChannel
 import com.ambulanceservice.mobile.data.booking.model.BookingResponse
+import com.ambulanceservice.mobile.data.booking.model.BookingStatus
 import com.ambulanceservice.mobile.ui.theme.MobileandroidTheme
 
 @Composable
@@ -514,7 +515,7 @@ private fun BookingScreenPreview() {
                     destinationAddress = "City General Hospital",
                     ambulanceType = AmbulanceType.ADVANCED_LIFE_SUPPORT,
                     bookingChannel = BookingChannel.ONLINE_MOBILE,
-                    status = "REQUESTED"
+                    status = BookingStatus.REQUESTED
                 )
             ),
             onContactNameChanged = {},
