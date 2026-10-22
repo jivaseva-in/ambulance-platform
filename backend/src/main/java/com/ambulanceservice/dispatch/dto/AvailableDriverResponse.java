@@ -7,7 +7,8 @@ public record AvailableDriverResponse(
     String fullName,
     String email,
     String phone,
-    String address
+    String address,
+    String ambulanceRegistrationNumber
 ) {
   public static AvailableDriverResponse fromEntity(User user) {
     return new AvailableDriverResponse(
@@ -15,8 +16,8 @@ public record AvailableDriverResponse(
         user.getFullName(),
         user.getEmail(),
         user.getPhone(),
-        user.getAddress()
+        user.getAddress(),
+        user.getAmbulanceRegistrationNumber()
     );
   }
 }
-

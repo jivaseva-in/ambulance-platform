@@ -48,6 +48,13 @@ public class AuthService {
       throw new IllegalArgumentException("Cannot register as Super Admin.");
     }
 
+    if (request.role() == Role.ROLE_DRIVER && (request.ambulanceRegistrationNumber() == null || request.ambulanceRegistrationNumber().isBlank())) {
+      throw new IllegalArgumentException("Ambulance registration number is required for drivers.");
+    }
+    if (request.role() == Role.ROLE_DRIVER && userRepository.existsByAmbulanceRegistrationNumber(request.ambulanceRegistrationNumber().trim())) {
+      throw new IllegalArgumentException("Ambulance registration number is already registered to another driver.");
+    }
+
     if ((request.role() == Role.ROLE_DRIVER || request.role() == Role.ROLE_DISPATCHER)
         && (request.address() == null || request.address().isBlank())) {
       throw new IllegalArgumentException("Address is required for drivers and dispatchers");
@@ -74,6 +81,7 @@ public class AuthService {
         .email(request.email().trim())
         .phone(request.phone().trim())
         .address(request.address() != null ? request.address().trim() : null)
+        .ambulanceRegistrationNumber(request.role() == Role.ROLE_DRIVER ? request.ambulanceRegistrationNumber().trim() : null)
         .password(passwordEncoder.encode(request.password()))
         .role(request.role())
         .status(initialStatus)

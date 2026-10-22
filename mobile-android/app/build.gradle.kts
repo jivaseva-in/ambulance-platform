@@ -81,6 +81,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
     implementation(libs.gson)
+    implementation(libs.maplibre.android.sdk)
     debugImplementation(libs.okhttp.logging.interceptor)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -59,6 +59,12 @@
             <p class="mt-1 text-xs text-slate-500">Required only for admin registration.</p>
         </div>
 
+        <div id="registerAmbulanceGroup" class="hidden">
+            <label for="registerAmbulanceRegistrationNumber" class="block text-xs font-semibold text-slate-600 uppercase mb-1">Ambulance Registration Number</label>
+            <input type="text" id="registerAmbulanceRegistrationNumber" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. KA-01-AB-1234">
+            <p class="mt-1 text-xs text-slate-500">Required for driver onboarding so dispatch can match the vehicle to the assigned trip.</p>
+        </div>
+
         <div class="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded p-3 text-sm text-slate-600">
             <input id="registerTerms" type="checkbox" class="mt-1">
             <label for="registerTerms">I understand that driver and dispatcher registrations may require approval before login.</label>
@@ -72,4 +78,3 @@
         </div>
     </form>
 </div>
-

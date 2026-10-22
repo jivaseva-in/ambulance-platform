@@ -20,15 +20,17 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.IconButton
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +45,12 @@ import com.ambulanceservice.mobile.data.booking.model.BookingChannel
 import com.ambulanceservice.mobile.data.booking.model.BookingResponse
 import com.ambulanceservice.mobile.data.booking.model.BookingStatus
 import com.ambulanceservice.mobile.ui.theme.MobileandroidTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+
+private data class MapCoordinate(
+    val latitude: Double,
+    val longitude: Double
+)
 
 @Composable
 fun BookingScreen(
@@ -51,9 +59,13 @@ fun BookingScreen(
     onContactPhoneChanged: (String) -> Unit,
     onPickupAddressChanged: (String) -> Unit,
     onDestinationAddressChanged: (String) -> Unit,
+    onPickupCoordinatesChanged: (Double, Double) -> Unit,
+    onDestinationCoordinatesChanged: (Double, Double) -> Unit,
     onAmbulanceTypeChanged: (AmbulanceType) -> Unit,
     onSubmit: () -> Unit,
     onTrackBookingIdChanged: (String) -> Unit,
+    onTrackPhoneNumberChanged: (String) -> Unit,
+    onLookupModeChanged: (BookingLookupMode) -> Unit,
     onTrackBooking: () -> Unit,
     onRefreshLiveLocation: (Long) -> Unit,
     onTabSelected: (BookingTab) -> Unit = {},
@@ -115,6 +127,8 @@ fun BookingScreen(
                         onContactPhoneChanged = onContactPhoneChanged,
                         onPickupAddressChanged = onPickupAddressChanged,
                         onDestinationAddressChanged = onDestinationAddressChanged,
+                        onPickupCoordinatesChanged = onPickupCoordinatesChanged,
+                        onDestinationCoordinatesChanged = onDestinationCoordinatesChanged,
                         onAmbulanceTypeChanged = onAmbulanceTypeChanged,
                         onSubmit = onSubmit,
                         onCancel = onTabHidden
@@ -125,6 +139,8 @@ fun BookingScreen(
                     TrackingLookupCard(
                         uiState = uiState,
                         onTrackBookingIdChanged = onTrackBookingIdChanged,
+                        onTrackPhoneNumberChanged = onTrackPhoneNumberChanged,
+                        onLookupModeChanged = onLookupModeChanged,
                         onTrackBooking = onTrackBooking,
                         onCancel = onTabHidden
                     )
@@ -193,6 +209,8 @@ private fun BookingFormCard(
     onContactPhoneChanged: (String) -> Unit,
     onPickupAddressChanged: (String) -> Unit,
     onDestinationAddressChanged: (String) -> Unit,
+    onPickupCoordinatesChanged: (Double, Double) -> Unit,
+    onDestinationCoordinatesChanged: (Double, Double) -> Unit,
     onAmbulanceTypeChanged: (AmbulanceType) -> Unit,
     onSubmit: () -> Unit,
     onCancel: () -> Unit
@@ -236,17 +254,15 @@ private fun BookingFormCard(
                 enabled = !uiState.isSubmitting
             )
 
-            OutlinedTextField(
-                value = uiState.form.pickupAddress,
-                onValueChange = onPickupAddressChanged,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Pickup address") },
-                isError = uiState.errors.pickupAddress != null,
-                supportingText = {
-                    uiState.errors.pickupAddress?.let { Text(it) }
+            PickupLocationSelector(
+                currentAddress = uiState.form.pickupAddress,
+                currentLatitude = uiState.form.pickupLatitude,
+                currentLongitude = uiState.form.pickupLongitude,
+                onAddressChanged = onPickupAddressChanged,
+                onCoordinatesChanged = { lat, lng ->
+                    onPickupCoordinatesChanged(lat, lng)
                 },
-                minLines = 2,
-                enabled = !uiState.isSubmitting
+                isSubmitting = uiState.isSubmitting
             )
 
             OutlinedTextField(
@@ -311,6 +327,8 @@ private fun BookingFormCard(
 private fun TrackingLookupCard(
     uiState: BookingUiState,
     onTrackBookingIdChanged: (String) -> Unit,
+    onTrackPhoneNumberChanged: (String) -> Unit,
+    onLookupModeChanged: (BookingLookupMode) -> Unit,
     onTrackBooking: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -320,20 +338,56 @@ private fun TrackingLookupCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Track a booking by ID",
+                text = "Track a booking",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
 
-            OutlinedTextField(
-                value = uiState.trackBookingId,
-                onValueChange = onTrackBookingIdChanged,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Booking ID") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                enabled = !uiState.isTracking
-            )
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { onLookupModeChanged(BookingLookupMode.ID) },
+                    modifier = Modifier.weight(1f),
+                    enabled = !uiState.isTracking,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("By ID")
+                }
+
+                Button(
+                    onClick = { onLookupModeChanged(BookingLookupMode.PHONE) },
+                    modifier = Modifier.weight(1f),
+                    enabled = !uiState.isTracking,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("By phone")
+                }
+            }
+
+            if (uiState.lookupMode == BookingLookupMode.ID) {
+                OutlinedTextField(
+                    value = uiState.trackBookingId,
+                    onValueChange = onTrackBookingIdChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Booking ID") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    enabled = !uiState.isTracking
+                )
+            } else {
+                OutlinedTextField(
+                    value = uiState.trackPhoneNumber,
+                    onValueChange = onTrackPhoneNumberChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Phone number") },
+                    placeholder = { Text("+254712345678") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    enabled = !uiState.isTracking
+                )
+            }
 
             Button(
                 onClick = onTrackBooking,
@@ -349,7 +403,7 @@ private fun TrackingLookupCard(
                     Spacer(modifier = Modifier.size(12.dp))
                     Text("Loading...")
                 } else {
-                    Text("Track status")
+                    Text(if (uiState.lookupMode == BookingLookupMode.ID) "Track status" else "Find latest booking")
                 }
             }
 
@@ -522,9 +576,13 @@ private fun BookingScreenPreview() {
             onContactPhoneChanged = {},
             onPickupAddressChanged = {},
             onDestinationAddressChanged = {},
+            onPickupCoordinatesChanged = { _, _ -> },
+            onDestinationCoordinatesChanged = { _, _ -> },
             onAmbulanceTypeChanged = {},
             onSubmit = {},
             onTrackBookingIdChanged = {},
+            onTrackPhoneNumberChanged = {},
+            onLookupModeChanged = {},
             onTrackBooking = {},
             onRefreshLiveLocation = {}
         )
@@ -630,5 +688,129 @@ private fun AmbulanceTypeOption(
                 .size(width = 2.dp, height = 36.dp)
                 .background(borderColor, RoundedCornerShape(999.dp))
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PickupLocationSelector(
+    currentAddress: String,
+    currentLatitude: Double?,
+    currentLongitude: Double?,
+    onAddressChanged: (String) -> Unit,
+    onCoordinatesChanged: (Double, Double) -> Unit,
+    isSubmitting: Boolean
+) {
+    var showMapPicker by remember { mutableStateOf(false) }
+    var selectedCoordinate by remember {
+        mutableStateOf(
+            if (currentLatitude != null && currentLongitude != null) {
+                MapCoordinate(currentLatitude, currentLongitude)
+            } else {
+                MapCoordinate(6.5244, 3.3792)
+            }
+        )
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Pickup location",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Button(
+                onClick = { showMapPicker = true },
+                enabled = !isSubmitting,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Select on map")
+            }
+        }
+
+        OutlinedTextField(
+            value = currentAddress,
+            onValueChange = onAddressChanged,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Pickup address") },
+            minLines = 2,
+            enabled = !isSubmitting
+        )
+
+        if (currentLatitude != null && currentLongitude != null) {
+            Text(
+                text = "Selected: ${"%.5f".format(currentLatitude)}, ${"%.5f".format(currentLongitude)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (showMapPicker) {
+            ModalBottomSheet(
+                onDismissRequest = { showMapPicker = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Choose pickup point",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(360.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("MapLibre / OSM preview")
+                            Text(
+                                text = "Local testing mode: no Google API key required",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Selected coordinate: ${"%.5f".format(selectedCoordinate.latitude)}, ${"%.5f".format(selectedCoordinate.longitude)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                selectedCoordinate = MapCoordinate(6.5244, 3.3792)
+                                onCoordinatesChanged(6.5244, 3.3792)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Reset")
+                        }
+
+                        Button(
+                            onClick = { showMapPicker = false },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Confirm")
+                        }
+                    }
+                }
+            }
+        }
     }
 }

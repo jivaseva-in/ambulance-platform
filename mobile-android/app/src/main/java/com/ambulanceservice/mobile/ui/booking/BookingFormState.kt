@@ -6,7 +6,11 @@ data class BookingFormState(
     val contactName: String = "",
     val contactPhone: String = "",
     val pickupAddress: String = "",
+    val pickupLatitude: Double? = null,
+    val pickupLongitude: Double? = null,
     val destinationAddress: String = "",
+    val destinationLatitude: Double? = null,
+    val destinationLongitude: Double? = null,
     val ambulanceType: AmbulanceType = AmbulanceType.ADVANCED_LIFE_SUPPORT
 )
 

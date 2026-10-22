@@ -39,7 +39,7 @@ function renderDispatchQueue(bookings) {
 
     const driverOptions = availableDrivers.length
         ? availableDrivers.map(driver => `
-            <option value="${driver.id}">${driver.fullName} (${driver.phone})</option>
+            <option value="${driver.id}">${driver.fullName} (${driver.phone})${driver.ambulanceRegistrationNumber ? ` • ${driver.ambulanceRegistrationNumber}` : ''}</option>
         `).join('')
         : '<option value="">No available drivers</option>';
 
@@ -275,6 +275,7 @@ function renderNearestDriverCandidates(candidates) {
             <div class="text-xs text-slate-600 space-y-1">
                 <div><span class="font-medium">Distance:</span> ${Number(driver.distanceKm || 0).toFixed(1)} km</div>
                 <div><span class="font-medium">Phone:</span> ${driver.phone || 'N/A'}</div>
+                <div><span class="font-medium">Ambulance:</span> ${driver.ambulanceRegistrationNumber || 'N/A'}</div>
                 <div><span class="font-medium">Last seen:</span> ${driver.lastLocationUpdate ? new Date(driver.lastLocationUpdate).toLocaleString() : 'N/A'}</div>
                 <div><span class="font-medium">Address:</span> ${driver.address || 'N/A'}</div>
             </div>

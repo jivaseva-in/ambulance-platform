@@ -9,26 +9,31 @@ let registerAddressHint;
 let registerInviteGroup;
 let registerInviteCode;
 let registerTerms;
+let registerAmbulanceGroup;
+let registerAmbulanceRegistrationNumber;
 
 function getSelectedRole() {
     return registerRole?.value || 'ROLE_USER';
 }
 
 function updateRoleUI() {
-    if (!registerRole || !registerAddress || !registerInviteGroup || !registerRoleHint || !registerAddressHint) return;
+    if (!registerRole || !registerAddress || !registerInviteGroup || !registerRoleHint || !registerAddressHint || !registerAmbulanceGroup || !registerAmbulanceRegistrationNumber) return;
 
     const role = getSelectedRole();
     const isStaffRole = role === 'ROLE_DRIVER' || role === 'ROLE_DISPATCHER';
     const isAdminRole = role === 'ROLE_ADMIN';
+    const isDriverRole = role === 'ROLE_DRIVER';
 
     registerAddress.required = isStaffRole;
     registerInviteGroup.classList.toggle('hidden', !isAdminRole);
+    registerAmbulanceGroup.classList.toggle('hidden', !isDriverRole);
+    registerAmbulanceRegistrationNumber.required = isDriverRole;
     if (registerInviteCode) {
         registerInviteCode.required = isAdminRole;
     }
 
     if (role === 'ROLE_DRIVER') {
-        registerRoleHint.textContent = 'Driver registrations require an address and approval.';
+        registerRoleHint.textContent = 'Driver registrations require an address and ambulance registration number.';
         registerAddressHint.textContent = 'Address required for driver onboarding and service coverage.';
     } else if (role === 'ROLE_DISPATCHER') {
         registerRoleHint.textContent = 'Dispatcher registrations require an address and approval.';
@@ -50,6 +55,7 @@ function validateForm() {
     const confirmPassword = document.getElementById('registerConfirmPassword').value;
     const address = registerAddress.value.trim();
     const inviteCode = registerInviteCode?.value.trim() || '';
+    const ambulanceRegistrationNumber = registerAmbulanceRegistrationNumber?.value.trim() || '';
     const role = getSelectedRole();
 
     if (!fullName || !email || !phone || !password || !confirmPassword) {
@@ -67,6 +73,11 @@ function validateForm() {
         return null;
     }
 
+    if (role === 'ROLE_DRIVER' && !ambulanceRegistrationNumber) {
+        showAlert('Ambulance registration number is required for driver registration.', 'error');
+        return null;
+    }
+
     if (role === 'ROLE_ADMIN' && !inviteCode) {
         showAlert('Admin registration requires an invitation code.', 'error');
         return null;
@@ -79,6 +90,7 @@ function validateForm() {
         password,
         confirmPassword,
         role,
+        ambulanceRegistrationNumber: ambulanceRegistrationNumber || null,
         address: address || null,
         inviteCode: inviteCode || null
     };
@@ -117,6 +129,8 @@ export function initRegisterModule() {
     registerInviteGroup = document.getElementById('registerInviteGroup');
     registerInviteCode = document.getElementById('registerInviteCode');
     registerTerms = document.getElementById('registerTerms');
+    registerAmbulanceGroup = document.getElementById('registerAmbulanceGroup');
+    registerAmbulanceRegistrationNumber = document.getElementById('registerAmbulanceRegistrationNumber');
 
     if (!registerForm) return;
 

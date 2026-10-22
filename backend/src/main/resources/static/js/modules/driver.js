@@ -217,6 +217,7 @@ function renderDriverAvailability(data) {
         lat: document.getElementById('driverAvailabilityLatitude'),
         lon: document.getElementById('driverAvailabilityLongitude')
     };
+    const registrationNode = document.getElementById('driverAmbulanceRegistrationNumber');
 
     if (!statusBadge || !locationOut || !toggleBtn) return;
 
@@ -232,6 +233,9 @@ function renderDriverAvailability(data) {
     if (locationInputs.lat && locationInputs.lon) {
         if (data?.latitude != null) locationInputs.lat.value = data.latitude;
         if (data?.longitude != null) locationInputs.lon.value = data.longitude;
+    }
+    if (registrationNode) {
+        registrationNode.textContent = data?.ambulanceRegistrationNumber || 'Not set';
     }
 }
 

@@ -28,6 +28,9 @@ public record RegisterRequest(
     @NotNull(message = "Role is required")
     Role role,
 
+    @Size(max = 50, message = "Ambulance registration number must be 50 characters or fewer")
+    String ambulanceRegistrationNumber,
+
     @Size(max = 255, message = "Address must be 255 characters or fewer")
     String address,
 

@@ -92,6 +92,7 @@ public class SecurityConfig {
             .requestMatchers("/api/v1/auth/**").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/v1/bookings").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/bookings/*").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/bookings/phone/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/bookings/*/location").permitAll()
 
             // Swagger Docs

@@ -15,7 +15,8 @@ public record DispatchDriverCandidateResponse(
     Double latitude,
     Double longitude,
     LocalDateTime lastLocationUpdate,
-    Double distanceKm
+    Double distanceKm,
+    String ambulanceRegistrationNumber
 ) {
   public static DispatchDriverCandidateResponse fromEntity(User user, Double distanceKm) {
     return new DispatchDriverCandidateResponse(
@@ -28,8 +29,8 @@ public record DispatchDriverCandidateResponse(
         user.getLatitude(),
         user.getLongitude(),
         user.getLastLocationUpdate(),
-        distanceKm
+        distanceKm,
+        user.getAmbulanceRegistrationNumber()
     );
   }
 }
-

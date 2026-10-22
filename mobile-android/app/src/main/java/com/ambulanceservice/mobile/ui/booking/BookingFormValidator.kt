@@ -7,6 +7,9 @@ object BookingFormValidator {
         val trimmedPickup = form.pickupAddress.trim()
         val trimmedDestination = form.destinationAddress.trim()
 
+        val hasPickupCoordinates = form.pickupLatitude != null && form.pickupLongitude != null
+        val hasDestinationCoordinates = form.destinationLatitude != null && form.destinationLongitude != null
+
         return BookingFormErrors(
             contactName = when {
                 trimmedName.isEmpty() -> "Contact name is required."
@@ -18,9 +21,14 @@ object BookingFormValidator {
                 trimmedPhone.length < 8 -> "Contact phone must be at least 8 characters."
                 else -> null
             },
-            pickupAddress = if (trimmedPickup.isEmpty()) "Pickup address is required." else null,
-            destinationAddress = if (trimmedDestination.isEmpty()) "Destination address is required." else null
+            pickupAddress = when {
+                trimmedPickup.isEmpty() && !hasPickupCoordinates -> "Pickup address is required."
+                else -> null
+            },
+            destinationAddress = when {
+                trimmedDestination.isEmpty() && !hasDestinationCoordinates -> "Destination address is required."
+                else -> null
+            }
         )
     }
 }
-

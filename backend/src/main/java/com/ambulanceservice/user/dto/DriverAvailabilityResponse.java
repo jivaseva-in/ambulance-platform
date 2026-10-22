@@ -12,7 +12,8 @@ public record DriverAvailabilityResponse(
     DriverAvailabilityStatus availabilityStatus,
     Double latitude,
     Double longitude,
-    LocalDateTime lastLocationUpdate
+    LocalDateTime lastLocationUpdate,
+    String ambulanceRegistrationNumber
 ) {
   public static DriverAvailabilityResponse fromEntity(User user) {
     return new DriverAvailabilityResponse(
@@ -22,8 +23,8 @@ public record DriverAvailabilityResponse(
         user.getAvailabilityStatus(),
         user.getLatitude(),
         user.getLongitude(),
-        user.getLastLocationUpdate()
+        user.getLastLocationUpdate(),
+        user.getAmbulanceRegistrationNumber()
     );
   }
 }
-

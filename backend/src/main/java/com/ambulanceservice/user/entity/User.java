@@ -51,6 +51,9 @@ public class User {
   @Column(nullable = false, length = 20)
   private DriverAvailabilityStatus availabilityStatus = DriverAvailabilityStatus.UNAVAILABLE;
 
+  @Column(length = 50)
+  private String ambulanceRegistrationNumber;
+
   @Column
   private Double latitude;
 
