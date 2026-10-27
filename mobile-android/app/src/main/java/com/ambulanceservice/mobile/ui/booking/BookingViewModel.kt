@@ -222,6 +222,17 @@ class BookingViewModel(
                         liveLocation = null
                     )
                 }
+
+                is BookingLookupResult.None -> {
+                    uiState = uiState.copy(
+                        isTracking = false,
+                        errorMessage = "No booking found for ID $bookingId.",
+                        showErrorMessage = true,
+                        trackedBooking = null,
+                        showTrackingResult = false,
+                        liveLocation = null
+                    )
+                }
             }
         }
     }
@@ -277,6 +288,17 @@ class BookingViewModel(
                     uiState = uiState.copy(
                         isTracking = false,
                         errorMessage = result.message,
+                        showErrorMessage = true,
+                        trackedBooking = null,
+                        showTrackingResult = false,
+                        liveLocation = null
+                    )
+                }
+
+                is BookingLookupResult.None -> {
+                    uiState = uiState.copy(
+                        isTracking = false,
+                        errorMessage = "No booking found for phone number $normalizedPhone.",
                         showErrorMessage = true,
                         trackedBooking = null,
                         showTrackingResult = false,

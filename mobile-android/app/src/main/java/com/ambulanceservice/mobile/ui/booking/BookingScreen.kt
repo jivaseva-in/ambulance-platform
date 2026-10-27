@@ -1,5 +1,7 @@
 package com.ambulanceservice.mobile.ui.booking
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +37,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -46,6 +50,7 @@ import com.ambulanceservice.mobile.data.booking.model.BookingResponse
 import com.ambulanceservice.mobile.data.booking.model.BookingStatus
 import com.ambulanceservice.mobile.ui.theme.MobileandroidTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.ui.text.style.TextAlign
 
 private data class MapCoordinate(
     val latitude: Double,
@@ -72,8 +77,12 @@ fun BookingScreen(
     onTabHidden: () -> Unit = {},
     onDismissMessage: () -> Unit = {},
     onDismissTrackingResult: () -> Unit = {},
+    onDriverAccessClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val emergencyPhone = AppEnvironment.emergencyPhoneNumber
+
     Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -83,9 +92,72 @@ fun BookingScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                HeaderSection()
-                EnvironmentCard()
-                IntroCard()
+                EmergencyCallCard(
+                    phoneNumber = emergencyPhone,
+                    onCallClick = {
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$emergencyPhone"))
+                        context.startActivity(intent)
+                    }
+                )
+
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Request Ambulance",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Emergency booking plus booking lookup and live ambulance tracking for a submitted request.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        BookingTabSelector(
+                            selectedTab = uiState.selectedTab,
+                            onTabSelected = onTabSelected,
+                            onTabHidden = onTabHidden
+                        )
+
+                        if (uiState.selectedTab == BookingTab.BOOKING) {
+                            BookingFormCard(
+                                uiState = uiState,
+                                onContactNameChanged = onContactNameChanged,
+                                onContactPhoneChanged = onContactPhoneChanged,
+                                onPickupAddressChanged = onPickupAddressChanged,
+                                onDestinationAddressChanged = onDestinationAddressChanged,
+                                onPickupCoordinatesChanged = onPickupCoordinatesChanged,
+                                onDestinationCoordinatesChanged = onDestinationCoordinatesChanged,
+                                onAmbulanceTypeChanged = onAmbulanceTypeChanged,
+                                onSubmit = onSubmit,
+                                onCancel = onTabHidden
+                            )
+                        }
+
+                        if (uiState.selectedTab == BookingTab.TRACKING) {
+                            TrackingLookupCard(
+                                uiState = uiState,
+                                onTrackBookingIdChanged = onTrackBookingIdChanged,
+                                onTrackPhoneNumberChanged = onTrackPhoneNumberChanged,
+                                onLookupModeChanged = onLookupModeChanged,
+                                onTrackBooking = onTrackBooking,
+                                onCancel = onTabHidden
+                            )
+                        }
+                    }
+                }
+
+                DriverAccessCard(onDriverAccessClick = onDriverAccessClick)
 
                 if (uiState.showErrorMessage && uiState.errorMessage != null) {
                     MessageCard(
@@ -113,40 +185,6 @@ fun BookingScreen(
                         onDismiss = onDismissTrackingResult
                     )
                 }
-
-                BookingTabSelector(
-                    selectedTab = uiState.selectedTab,
-                    onTabSelected = onTabSelected,
-                    onTabHidden = onTabHidden
-                )
-
-                if (uiState.selectedTab == BookingTab.BOOKING) {
-                    BookingFormCard(
-                        uiState = uiState,
-                        onContactNameChanged = onContactNameChanged,
-                        onContactPhoneChanged = onContactPhoneChanged,
-                        onPickupAddressChanged = onPickupAddressChanged,
-                        onDestinationAddressChanged = onDestinationAddressChanged,
-                        onPickupCoordinatesChanged = onPickupCoordinatesChanged,
-                        onDestinationCoordinatesChanged = onDestinationCoordinatesChanged,
-                        onAmbulanceTypeChanged = onAmbulanceTypeChanged,
-                        onSubmit = onSubmit,
-                        onCancel = onTabHidden
-                    )
-                }
-
-                if (uiState.selectedTab == BookingTab.TRACKING) {
-                    TrackingLookupCard(
-                        uiState = uiState,
-                        onTrackBookingIdChanged = onTrackBookingIdChanged,
-                        onTrackPhoneNumberChanged = onTrackPhoneNumberChanged,
-                        onLookupModeChanged = onLookupModeChanged,
-                        onTrackBooking = onTrackBooking,
-                        onCancel = onTabHidden
-                    )
-                }
-
-                FutureFeaturesCard()
             }
         }
     }
@@ -169,6 +207,51 @@ private fun HeaderSection() {
 }
 
 @Composable
+private fun EmergencyCallCard(
+    phoneNumber: String,
+    onCallClick: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.error
+        ),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Emergency",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onError
+            )
+            Button(
+                onClick = onCallClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text(
+                    text = "Call $phoneNumber",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun EnvironmentCard() {
     MessageCard(
         title = "Current environment",
@@ -176,30 +259,6 @@ private fun EnvironmentCard() {
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
     )
-}
-
-@Composable
-private fun IntroCard() {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "MVP scope",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "This version creates bookings with ONLINE_MOBILE and supports a public lookup by booking ID plus live ambulance location.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
 }
 
 @Composable
@@ -617,29 +676,6 @@ private fun BookingTabSelector(
     }
 }
 
-@Composable
-private fun FutureFeaturesCard() {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Next upgrades",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text("• GPS pickup detection")
-            Text("• Booking tracking by ID")
-            Text("• Login / registration")
-            Text("• Driver and dispatcher workflows")
-        }
-    }
-}
 
 @Composable
 private fun AmbulanceTypeOption(
@@ -810,6 +846,42 @@ private fun PickupLocationSelector(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DriverAccessCard(onDriverAccessClick: () -> Unit) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Driver portal",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Text(
+                text = "Registered drivers can log in or register here to serve incoming ambulance requests.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Button(
+                onClick = onDriverAccessClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Driver access")
             }
         }
     }

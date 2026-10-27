@@ -3,7 +3,9 @@ package com.ambulanceservice.mobile.data.booking.repository
 import com.ambulanceservice.mobile.config.AppEnvironment
 import com.ambulanceservice.mobile.data.booking.model.ApiErrorResponse
 import com.ambulanceservice.mobile.data.booking.model.BookingResponse
+import com.ambulanceservice.mobile.data.booking.model.BookingStatus
 import com.ambulanceservice.mobile.data.booking.model.CreateBookingRequest
+import com.ambulanceservice.mobile.data.booking.model.UpdateBookingStatusRequest
 import com.ambulanceservice.mobile.data.booking.network.BookingApiService
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +66,106 @@ class BookingRepository(
         }
     }
 
+    suspend fun getAvailableBookings(token: String): BookingListResult = withContext(Dispatchers.IO) {
+        try {
+            val bearerToken = ensureBearerToken(token)
+            val response = bookingApiService.getAvailableBookings(bearerToken)
+            val body = response.body()
+
+            if (response.isSuccessful && body != null) {
+                BookingListResult.Success(body)
+            } else {
+                BookingListResult.Error(
+                    parseErrorMessage(response.errorBody()?.string())
+                        ?: "Could not load available bookings."
+                )
+            }
+        } catch (_: IOException) {
+            BookingListResult.Error("Could not connect to the ambulance platform backend.")
+        } catch (exception: Exception) {
+            BookingListResult.Error(exception.message ?: "Unexpected booking list error.")
+        }
+    }
+
+    suspend fun acceptBooking(token: String, bookingId: Long): BookingSubmissionResult = withContext(Dispatchers.IO) {
+        try {
+            val bearerToken = ensureBearerToken(token)
+            val response = bookingApiService.acceptBooking(bearerToken, bookingId)
+            val body = response.body()
+
+            if (response.isSuccessful && body != null) {
+                BookingSubmissionResult.Success(body)
+            } else {
+                BookingSubmissionResult.Error(
+                    parseErrorMessage(response.errorBody()?.string())
+                        ?: "Could not accept booking #$bookingId."
+                )
+            }
+        } catch (_: IOException) {
+            BookingSubmissionResult.Error("Could not connect to the ambulance platform backend.")
+        } catch (exception: Exception) {
+            BookingSubmissionResult.Error(exception.message ?: "Unexpected accept booking error.")
+        }
+    }
+
+    suspend fun updateBookingStatus(
+        token: String,
+        bookingId: Long,
+        status: BookingStatus,
+        cancellationReason: String? = null
+    ): BookingSubmissionResult = withContext(Dispatchers.IO) {
+        try {
+            val bearerToken = ensureBearerToken(token)
+            val response = bookingApiService.updateBookingStatus(
+                token = bearerToken,
+                id = bookingId,
+                request = UpdateBookingStatusRequest(status = status, cancellationReason = cancellationReason)
+            )
+            val body = response.body()
+
+            if (response.isSuccessful && body != null) {
+                BookingSubmissionResult.Success(body)
+            } else {
+                BookingSubmissionResult.Error(
+                    parseErrorMessage(response.errorBody()?.string())
+                        ?: "Could not update booking status."
+                )
+            }
+        } catch (_: IOException) {
+            BookingSubmissionResult.Error("Could not connect to the ambulance platform backend.")
+        } catch (exception: Exception) {
+            BookingSubmissionResult.Error(exception.message ?: "Unexpected booking update error.")
+        }
+    }
+
+    suspend fun getDriverActiveTrip(token: String): BookingLookupResult = withContext(Dispatchers.IO) {
+        try {
+            val bearerToken = ensureBearerToken(token)
+            val response = bookingApiService.getDriverActiveTrip(bearerToken)
+
+            if (response.code() == 204) {
+                return@withContext BookingLookupResult.None
+            }
+
+            val body = response.body()
+            if (response.isSuccessful && body != null) {
+                BookingLookupResult.Success(body)
+            } else {
+                BookingLookupResult.Error(
+                    parseErrorMessage(response.errorBody()?.string())
+                        ?: "No active trip found."
+                )
+            }
+        } catch (_: IOException) {
+            BookingLookupResult.Error("Could not connect to the ambulance platform backend.")
+        } catch (exception: Exception) {
+            BookingLookupResult.Error(exception.message ?: "Unexpected trip lookup error.")
+        }
+    }
+
+    private fun ensureBearerToken(token: String): String =
+        if (token.startsWith("Bearer ", ignoreCase = true)) token else "Bearer $token"
+
     private fun parseErrorMessage(rawError: String?): String? {
         if (rawError.isNullOrBlank()) return null
 
@@ -83,4 +185,10 @@ sealed interface BookingSubmissionResult {
 sealed interface BookingLookupResult {
     data class Success(val booking: BookingResponse) : BookingLookupResult
     data class Error(val message: String) : BookingLookupResult
+    data object None : BookingLookupResult
+}
+
+sealed interface BookingListResult {
+    data class Success(val bookings: List<BookingResponse>) : BookingListResult
+    data class Error(val message: String) : BookingListResult
 }

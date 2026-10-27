@@ -2,8 +2,10 @@ package com.ambulanceservice.mobile.data.booking.network
 
 import com.ambulanceservice.mobile.BuildConfig
 import com.ambulanceservice.mobile.config.AppEnvironment
-import com.google.gson.GsonBuilder
+import com.ambulanceservice.mobile.data.auth.network.AuthApiService
 import com.ambulanceservice.mobile.data.booking.model.LocalDateTimeAdapter
+import com.ambulanceservice.mobile.data.driver.network.DriverApiService
+import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -44,5 +46,13 @@ object ApiClient {
 
     val bookingTrackingApiService: BookingTrackingApiService by lazy {
         retrofit.create(BookingTrackingApiService::class.java)
+    }
+
+    val authApiService: AuthApiService by lazy {
+        retrofit.create(AuthApiService::class.java)
+    }
+
+    val driverApiService: DriverApiService by lazy {
+        retrofit.create(DriverApiService::class.java)
     }
 }

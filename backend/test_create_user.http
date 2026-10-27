@@ -1,0 +1,105 @@
+### 1. Register a Patient User
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "John Doe",
+  "email": "john.doe@example.com",
+  "phone": "+1234567890",
+  "password": "Password123!",
+  "confirmPassword": "Password123!",
+  "address": "123 Main St, Cityville",
+  "role": "ROLE_USER"
+}
+
+### 2. Register an Ambulance Driver
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Dave Driver",
+  "email": "dave.driver@example.com",
+  "phone": "+1987654321",
+  "password": "DriverPassword123!",
+  "confirmPassword": "DriverPassword123!",
+  "address": "123 Driver St, Cityville",
+  "role": "ROLE_DRIVER",
+  "ambulanceRegistrationNumber": "WB13-A1234"
+}
+
+### 2. Register an Ambulance Driver
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Paul Driver",
+  "email": "paul.driver@example.com",
+  "phone": "+1987651234",
+  "password": "DriverPassword123!",
+  "confirmPassword": "DriverPassword123!",
+  "address": "124 Driver St, Cityville",
+  "role": "ROLE_DRIVER",
+  "ambulanceRegistrationNumber": "WB13-A4321"
+}
+
+### 3. Login with Email
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "john.doe@example.com",
+  "password": "Password123!"
+}
+
+### 4. Login with Phone Number
+POST http://localhost:8080/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "+1234567890",
+  "password": "Password123!"
+}
+
+### 5: REGISTER ADMIN USER
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Alice Admin",
+  "email": "alice.admin@example.com",
+  "phone": "+1555000111",
+  "password": "AdminPassword123!",
+  "confirmPassword": "AdminPassword123!",
+  "address": "456 Admin St, Cityville",
+  "role": "ROLE_ADMIN",
+  "inviteCode": "ADMIN-INVITE-2026"
+}
+
+### 6: REGISTER ADMIN USER
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Bob Admin",
+  "email": "bob.admin@example.com",
+  "phone": "+1555000222",
+  "password": "AdminPassword123!",
+  "confirmPassword": "AdminPassword123!",
+  "address": "456 Admin St, Cityville",
+  "role": "ROLE_ADMIN",
+  "inviteCode": "ADMIN-INVITE-2026"
+}
+
+### 7. Register a Dispatcher User
+POST http://localhost:8080/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Peter Dispatcher",
+  "email": "peter.dispatcher@example.com",
+  "phone": "+1987654343",
+  "password": "DispatcherPassword123!",
+  "confirmPassword": "DispatcherPassword123!",
+  "address": "123 Dispatcher St, Cityville",
+  "role": "ROLE_DISPATCHER"
+}

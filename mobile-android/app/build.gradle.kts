@@ -6,6 +6,10 @@ val renderApiBaseUrl = providers.gradleProperty("API_BASE_URL_RENDER")
     .orElse("https://your-render-service.onrender.com/")
     .get()
 
+val emergencyPhoneNumber = providers.gradleProperty("EMERGENCY_PHONE_NUMBER")
+    .orElse("112")
+    .get()
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -35,12 +39,14 @@ android {
             versionNameSuffix = "-local"
             buildConfigField("String", "API_BASE_URL", "\"$localApiBaseUrl\"")
             buildConfigField("String", "ENVIRONMENT_NAME", "\"Local\"")
+            buildConfigField("String", "EMERGENCY_PHONE_NUMBER", "\"$emergencyPhoneNumber\"")
         }
 
         create("render") {
             dimension = "environment"
             buildConfigField("String", "API_BASE_URL", "\"$renderApiBaseUrl\"")
             buildConfigField("String", "ENVIRONMENT_NAME", "\"Render\"")
+            buildConfigField("String", "EMERGENCY_PHONE_NUMBER", "\"$emergencyPhoneNumber\"")
         }
     }
 

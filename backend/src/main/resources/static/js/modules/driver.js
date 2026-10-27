@@ -56,20 +56,52 @@ export function updateDriverStatusCard(booking) {
     const summaryDiv = document.getElementById('driverTargetPatientSummary');
 
     if (!booking) {
-        statusBadge.innerHTML = '<span class="text-slate-400">-- No Trip Loaded --</span>';
-        summaryDiv.textContent = '--';
+        statusBadge.innerHTML = '<span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">No active trip</span>';
+        summaryDiv.innerHTML = `
+            <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2 text-center">
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">No active trip</div>
+            </div>
+        `;
         return;
     }
 
+    const tripStatusClasses = {
+        COMPLETED: 'border-emerald-200 bg-emerald-100 text-emerald-800 shadow-sm',
+        ARRIVED: 'border-violet-200 bg-violet-100 text-violet-800 shadow-sm',
+        IN_TRANSIT: 'border-amber-200 bg-amber-100 text-amber-800 shadow-sm',
+        ASSIGNED: 'border-blue-200 bg-blue-100 text-blue-800 shadow-sm',
+        CANCELLED: 'border-rose-200 bg-rose-100 text-rose-800 shadow-sm',
+        default: 'border-slate-200 bg-slate-100 text-slate-700 shadow-sm'
+    };
+    const statusClass = tripStatusClasses[booking.status] || tripStatusClasses.default;
+
     targetIdInput.value = booking.id;
-    statusBadge.innerHTML = `<span class="px-2 py-0.5 rounded text-xs font-bold ${
-        booking.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' :
-            booking.status === 'ARRIVED' ? 'bg-indigo-100 text-indigo-800' :
-                booking.status === 'IN_TRANSIT' ? 'bg-amber-100 text-amber-800' :
-                    booking.status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800' :
-                        'bg-slate-100 text-slate-800'
-    }">${booking.status}</span>`;
-    summaryDiv.textContent = `${booking.contactName || 'Emergency'} (${booking.pickupAddress || 'No address'})`;
+    statusBadge.innerHTML = `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${statusClass}">${booking.status}</span>`;
+    summaryDiv.innerHTML = `
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-2.5 shadow-sm">
+            <div class="flex items-start justify-between gap-2">
+                <div>
+                    <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Patient</div>
+                    <div class="mt-1 text-sm font-bold text-slate-800">${booking.contactName || 'Emergency patient'}</div>
+                </div>
+                <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">#${booking.id}</span>
+            </div>
+            <div class="mt-2 space-y-1.5 text-[11px] text-slate-600">
+                <div class="flex items-start gap-2">
+                    <span class="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">📍</span>
+                    <div class="leading-snug"><span class="font-semibold text-slate-700">Pickup:</span> ${booking.pickupAddress || 'No pickup address'}</div>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-violet-100 text-violet-700">🏥</span>
+                    <div class="leading-snug"><span class="font-semibold text-slate-700">Destination:</span> ${booking.destinationAddress || 'No destination address'}</div>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-100 text-amber-700">🩺</span>
+                    <div class="leading-snug"><span class="font-semibold text-slate-700">Condition:</span> ${booking.patientCondition || 'Emergency'}</div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 export async function syncActiveTripFromBackend() {
