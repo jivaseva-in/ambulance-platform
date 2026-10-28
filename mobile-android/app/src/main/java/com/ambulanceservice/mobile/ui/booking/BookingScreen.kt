@@ -51,11 +51,13 @@ import com.ambulanceservice.mobile.data.booking.model.BookingStatus
 import com.ambulanceservice.mobile.ui.theme.MobileandroidTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.text.style.TextAlign
-
-private data class MapCoordinate(
-    val latitude: Double,
-    val longitude: Double
-)
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberUpdatedMarkerState
+import kotlinx.coroutines.delay
 
 @Composable
 fun BookingScreen(
@@ -804,15 +806,6 @@ private fun PickupLocationSelector(
     isSubmitting: Boolean
 ) {
     var showMapPicker by remember { mutableStateOf(false) }
-    var selectedCoordinate by remember {
-        mutableStateOf(
-            if (currentLatitude != null && currentLongitude != null) {
-                MapCoordinate(currentLatitude, currentLongitude)
-            } else {
-                MapCoordinate(6.5244, 3.3792)
-            }
-        )
-    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
@@ -827,11 +820,19 @@ private fun PickupLocationSelector(
             )
             Button(
                 onClick = { showMapPicker = true },
-                enabled = !isSubmitting,
+                enabled = !isSubmitting && AppEnvironment.googleMapsConfigured,
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Select on map")
             }
+        }
+
+        if (!AppEnvironment.googleMapsConfigured) {
+            Text(
+                text = "Map selection is unavailable: Google Maps API key is not configured. Enter the pickup address manually.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
         }
 
         OutlinedTextField(
@@ -852,13 +853,37 @@ private fun PickupLocationSelector(
         }
 
         if (showMapPicker) {
+            val initialCoordinate = remember {
+                if (currentLatitude != null && currentLongitude != null) {
+                    LatLng(currentLatitude, currentLongitude)
+                } else {
+                    null
+                }
+            }
+            var selectedCoordinate by remember { mutableStateOf(initialCoordinate) }
+            val initialCameraPosition = remember {
+                CameraPosition.fromLatLngZoom(initialCoordinate ?: LatLng(6.5244, 3.3792), 12f)
+            }
+            val cameraPositionState = rememberCameraPositionState {
+                position = initialCameraPosition
+            }
+            var mapLoaded by remember { mutableStateOf(false) }
+            var mapLoadTimedOut by remember { mutableStateOf(false) }
+
+            LaunchedEffect(Unit) {
+                delay(15_000)
+                if (!mapLoaded) mapLoadTimedOut = true
+            }
+
             ModalBottomSheet(
                 onDismissRequest = { showMapPicker = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                sheetGesturesEnabled = false
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -875,19 +900,41 @@ private fun PickupLocationSelector(
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("MapLibre / OSM preview")
-                            Text(
-                                text = "Local testing mode: no Google API key required",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Selected coordinate: ${"%.5f".format(selectedCoordinate.latitude)}, ${"%.5f".format(selectedCoordinate.longitude)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        GoogleMap(
+                            modifier = Modifier.fillMaxSize(),
+                            cameraPositionState = cameraPositionState,
+                            onMapLoaded = { mapLoaded = true },
+                            onMapClick = { selectedCoordinate = it }
+                        ) {
+                            selectedCoordinate?.let { coordinate ->
+                                Marker(
+                                    state = rememberUpdatedMarkerState(position = coordinate),
+                                    title = "Pickup location"
+                                )
+                            }
                         }
+                        if (!mapLoaded) {
+                            CircularProgressIndicator()
+                        }
+                    }
+
+                    Text(
+                        text = "Tap the map to select your pickup point. Enter the street address or landmark in the booking form.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (mapLoadTimedOut && !mapLoaded) {
+                        Text(
+                            text = "Google Maps could not load. Check your connection and Maps API configuration, or cancel and enter the address manually.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    selectedCoordinate?.let { coordinate ->
+                        Text(
+                            text = "Selected coordinate: ${"%.5f".format(coordinate.latitude)}, ${"%.5f".format(coordinate.longitude)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
                     Row(
@@ -896,8 +943,8 @@ private fun PickupLocationSelector(
                     ) {
                         OutlinedButton(
                             onClick = {
-                                selectedCoordinate = MapCoordinate(6.5244, 3.3792)
-                                onCoordinatesChanged(6.5244, 3.3792)
+                                selectedCoordinate = initialCoordinate
+                                cameraPositionState.position = initialCameraPosition
                             },
                             modifier = Modifier.weight(1f)
                         ) {
@@ -905,11 +952,23 @@ private fun PickupLocationSelector(
                         }
 
                         Button(
-                            onClick = { showMapPicker = false },
+                            onClick = {
+                                selectedCoordinate?.let { coordinate ->
+                                    onCoordinatesChanged(coordinate.latitude, coordinate.longitude)
+                                    showMapPicker = false
+                                }
+                            },
+                            enabled = mapLoaded && selectedCoordinate != null && !isSubmitting,
                             modifier = Modifier.weight(1f)
                         ) {
                             Text("Confirm")
                         }
+                    }
+                    OutlinedButton(
+                        onClick = { showMapPicker = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cancel")
                     }
                 }
             }

@@ -13,7 +13,7 @@ coroutines = "1.8.1"
 retrofit = "2.11.0"
 gson = "2.11.0"
 okhttpLogging = "4.12.0"
-mapLibre = "12.3.1"
+mapsCompose = "6.12.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -37,7 +37,7 @@ retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = 
 retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttpLogging" }
-maplibre-android-sdk = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "mapLibre" }
+google-maps-compose = { group = "com.google.maps.android", name = "maps-compose", version.ref = "mapsCompose" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

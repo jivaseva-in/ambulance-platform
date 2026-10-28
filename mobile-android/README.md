@@ -34,6 +34,36 @@ API_BASE_URL_LOCAL=http://10.0.2.2:8080/
 API_BASE_URL_RENDER=https://your-render-service.onrender.com/
 ```
 
+## Google Maps pickup selection
+
+The pickup selector uses the Google Maps SDK for Android. Map taps select a
+marker; **Confirm** saves its coordinates to the booking. **Reset** restores the
+previous selection, and **Cancel** or dismissing the sheet discards changes.
+The address must still be entered manually; this does not add Places search,
+reverse geocoding, or GPS location access.
+
+1. In Google Cloud, enable **Maps SDK for Android** and billing for your project.
+2. Create an API key restricted to Maps SDK for Android and your Android app's
+   package name and signing certificate SHA-1. Configure both
+   `com.ambulanceservice.mobile.local` (local flavor) and
+   `com.ambulanceservice.mobile` (render flavor), with the appropriate debug or
+   release certificate.
+3. Set `GOOGLE_MAPS_API_KEY` in your user-level
+   `%USERPROFILE%\.gradle\gradle.properties` (not the tracked project file), or
+   supply it as an environment variable. The Gradle property takes precedence.
+4. Rebuild and install the app on a device/emulator with Google Play services.
+
+```powershell
+$env:GOOGLE_MAPS_API_KEY = "your-restricted-android-maps-key"
+.\gradlew.bat :app:assembleLocalDebug
+```
+
+The key is packaged into the app's manifest, so Android application/API
+restrictions are essential. Do not commit keys. Without a configured key,
+the app shows a configuration message and keeps manual address entry available.
+If the map stays blank, check connectivity, billing, API restrictions, and the
+installed app's package/SHA-1 restrictions in Google Cloud.
+
 ## Local backend notes
 
 For the Android emulator, use `10.0.2.2` to reach your host machine.
@@ -69,4 +99,3 @@ Set-Location "D:\test\ambulance-platform\mobile-android"
 - booking status / tracking by ID
 - user registration and login
 - driver and dispatcher modules
-

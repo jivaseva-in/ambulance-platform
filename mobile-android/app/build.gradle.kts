@@ -3,12 +3,18 @@ val localApiBaseUrl = providers.gradleProperty("API_BASE_URL_LOCAL")
     .get()
 
 val renderApiBaseUrl = providers.gradleProperty("API_BASE_URL_RENDER")
-    .orElse("https://your-render-service.onrender.com/")
+    .orElse("https://ambulance-platform.onrender.com/")
     .get()
 
 val emergencyPhoneNumber = providers.gradleProperty("EMERGENCY_PHONE_NUMBER")
     .orElse("112")
     .get()
+
+val googleMapsApiKey = providers.gradleProperty("GOOGLE_MAPS_API_KEY")
+    .orElse(providers.environmentVariable("GOOGLE_MAPS_API_KEY"))
+    .orElse("")
+    .get()
+    .trim()
 
 plugins {
     alias(libs.plugins.android.application)
@@ -29,23 +35,25 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
+        buildConfigField("boolean", "GOOGLE_MAPS_CONFIGURED", googleMapsApiKey.isNotEmpty().toString())
     }
 
     flavorDimensions += "environment"
     productFlavors {
+        create("render") {
+            dimension = "environment"
+            buildConfigField("String", "API_BASE_URL", "\"$renderApiBaseUrl\"")
+            buildConfigField("String", "ENVIRONMENT_NAME", "\"Render\"")
+            buildConfigField("String", "EMERGENCY_PHONE_NUMBER", "\"$emergencyPhoneNumber\"")
+        }
+
         create("local") {
             dimension = "environment"
             applicationIdSuffix = ".local"
             versionNameSuffix = "-local"
             buildConfigField("String", "API_BASE_URL", "\"$localApiBaseUrl\"")
             buildConfigField("String", "ENVIRONMENT_NAME", "\"Local\"")
-            buildConfigField("String", "EMERGENCY_PHONE_NUMBER", "\"$emergencyPhoneNumber\"")
-        }
-
-        create("render") {
-            dimension = "environment"
-            buildConfigField("String", "API_BASE_URL", "\"$renderApiBaseUrl\"")
-            buildConfigField("String", "ENVIRONMENT_NAME", "\"Render\"")
             buildConfigField("String", "EMERGENCY_PHONE_NUMBER", "\"$emergencyPhoneNumber\"")
         }
     }
@@ -87,7 +95,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
     implementation(libs.gson)
-    implementation(libs.maplibre.android.sdk)
+    implementation(libs.google.maps.compose)
     debugImplementation(libs.okhttp.logging.interceptor)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
