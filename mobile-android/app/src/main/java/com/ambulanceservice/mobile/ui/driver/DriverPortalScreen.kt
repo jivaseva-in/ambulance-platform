@@ -1,5 +1,8 @@
 package com.ambulanceservice.mobile.ui.driver
 
+import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,16 +13,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.background
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,9 +30,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.ambulanceservice.mobile.data.booking.model.BookingResponse
 import com.ambulanceservice.mobile.data.booking.model.BookingStatus
 import com.ambulanceservice.mobile.data.booking.repository.BookingListResult
@@ -43,6 +46,23 @@ import com.ambulanceservice.mobile.data.driver.repository.DriverResult
 import com.ambulanceservice.mobile.di.AppContainer
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
+
+@Composable
+private fun ClickablePhoneText(phone: String?) {
+    val context = LocalContext.current
+    val sanitizedPhone = phone?.replace(Regex("[^+\\d]"), "")?.trim()
+
+    Text(
+        text = if (sanitizedPhone.isNullOrBlank()) "Call: unavailable" else "Call: $sanitizedPhone",
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (sanitizedPhone.isNullOrBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.clickable(enabled = !sanitizedPhone.isNullOrBlank()) {
+            val dialIntent = Intent(Intent.ACTION_DIAL, "tel:$sanitizedPhone".toUri())
+            context.startActivity(dialIntent)
+        }
+    )
+}
 
 @Composable
 fun DriverPortalScreen(
@@ -64,14 +84,36 @@ fun DriverPortalScreen(
     var activeTrip by remember { mutableStateOf<BookingResponse?>(null) }
     var tripMessage by remember { mutableStateOf<String?>(null) }
     var tripLoading by remember { mutableStateOf(false) }
-
     var showLocationEditor by remember { mutableStateOf(false) }
 
-    val isAvailable = status.uppercase() == "AVAILABLE"
-    val hasActiveTrip = activeTrip != null
-    val prioritizedAvailableTrips = availableBookings
+    val visibleAvailableTrips = availableBookings
+        .filterNot { it.id == activeTrip?.id }
+        .filter { booking ->
+            booking.status in listOf(
+                BookingStatus.REQUESTED,
+                BookingStatus.REASSIGNMENT_PENDING,
+                BookingStatus.NEGOTIATION_FAILED,
+                BookingStatus.CANCEL_REQUESTED
+            )
+        }
         .sortedByDescending { it.createdAt ?: LocalDateTime.MIN }
         .take(5)
+
+    val activeTripStatuses = setOf(
+        BookingStatus.DRIVER_HELD,
+        BookingStatus.CONFIRMED,
+        BookingStatus.ASSIGNED,
+        BookingStatus.IN_TRANSIT,
+        BookingStatus.ARRIVED
+    )
+
+    fun shouldKeepActiveTrip(status: BookingStatus?): Boolean =
+        status in activeTripStatuses
+
+    val isAvailable = status.equals("AVAILABLE", ignoreCase = true)
+    val hasActiveTrip = activeTrip != null
+    val canAcceptTrips = isAvailable && !hasActiveTrip && !tripLoading
+    val prioritizedAvailableTrips = visibleAvailableTrips
 
     fun loadTripData() {
         scope.launch {
@@ -80,7 +122,13 @@ fun DriverPortalScreen(
 
             when (val tripResult = bookingRepository.getDriverActiveTrip(authToken)) {
                 is BookingLookupResult.Success -> activeTrip = tripResult.booking
-                is BookingLookupResult.None -> activeTrip = null
+                is BookingLookupResult.None -> {
+                    val currentTripStatus = activeTrip?.status
+                    val shouldKeepCurrentTrip = currentTripStatus?.let { shouldKeepActiveTrip(it) } ?: false
+                    if (!shouldKeepCurrentTrip) {
+                        activeTrip = null
+                    }
+                }
                 is BookingLookupResult.Error -> {
                     activeTrip = null
                     tripMessage = tripResult.message
@@ -88,9 +136,7 @@ fun DriverPortalScreen(
             }
 
             when (val bookingsResult = bookingRepository.getAvailableBookings(authToken)) {
-                is BookingListResult.Success -> {
-                    availableBookings = bookingsResult.bookings
-                }
+                is BookingListResult.Success -> availableBookings = bookingsResult.bookings
                 is BookingListResult.Error -> {
                     availableBookings = emptyList()
                     if (tripMessage.isNullOrBlank()) {
@@ -131,13 +177,113 @@ fun DriverPortalScreen(
             when (val result = bookingRepository.acceptBooking(authToken, bookingId)) {
                 is BookingSubmissionResult.Success -> {
                     activeTrip = result.booking
-                    tripMessage = "Trip accepted successfully."
+                    availableBookings = availableBookings.filterNot { it.id == bookingId }
+                    tripMessage = "Trip accepted. Review the active trip and either confirm it or mark negotiation failed."
+                    loadTripData()
+                }
+                is BookingSubmissionResult.Error -> {
+                    tripMessage = result.message
+                    if (result.message.contains("Booking is not available for a new driver hold", ignoreCase = true)) {
+                        activeTrip = null
+                        loadTripData()
+                    }
+                }
+            }
+
+            tripLoading = false
+        }
+    }
+
+    fun confirmHeldBooking() {
+        val tripId = activeTrip?.id ?: return
+
+        scope.launch {
+            tripLoading = true
+            tripMessage = null
+
+            when (val result = bookingRepository.confirmBooking(authToken, tripId)) {
+                is BookingSubmissionResult.Success -> {
+                    activeTrip = result.booking
+                    availableBookings = availableBookings.filterNot { it.id == tripId }
+                    tripMessage = "Booking confirmed. You can now proceed to the trip."
                     loadTripData()
                 }
                 is BookingSubmissionResult.Error -> tripMessage = result.message
             }
 
             tripLoading = false
+        }
+    }
+
+    fun failNegotiation(reason: String? = null) {
+        val tripId = activeTrip?.id ?: return
+
+        scope.launch {
+            tripLoading = true
+            tripMessage = null
+
+            when (val result = bookingRepository.failNegotiation(authToken, tripId, reason)) {
+                is BookingSubmissionResult.Success -> {
+                    activeTrip = null
+                    val refreshedList = (listOfNotNull(result.booking) + availableBookings.filterNot { it.id == tripId })
+                        .distinctBy { it.id }
+                    availableBookings = refreshedList
+                    tripMessage = "Negotiation failed. The request has been released for another driver."
+                    loadTripData()
+                }
+                is BookingSubmissionResult.Error -> tripMessage = result.message
+            }
+
+            tripLoading = false
+        }
+    }
+
+    fun cancelHeldBooking(reason: String? = null) {
+        val tripId = activeTrip?.id ?: return
+
+        scope.launch {
+            tripLoading = true
+            tripMessage = null
+
+            when (val result = bookingRepository.cancelBookingRequest(authToken, tripId, reason)) {
+                is BookingSubmissionResult.Success -> {
+                    activeTrip = null
+                    val refreshedList = (listOfNotNull(result.booking) + availableBookings.filterNot { it.id == tripId })
+                        .distinctBy { it.id }
+                    availableBookings = refreshedList
+                    tripMessage = "Booking cancelled and released for reassignment."
+                    loadTripData()
+                }
+                is BookingSubmissionResult.Error -> tripMessage = result.message
+            }
+
+            tripLoading = false
+        }
+    }
+
+    fun recoverActiveTripFromAssignedBookings() {
+        scope.launch {
+            when (val myBookingsResult = bookingRepository.getMyBookings(authToken)) {
+                is BookingListResult.Success -> {
+                    val recovered = myBookingsResult.bookings
+                        .filter { it.status in activeTripStatuses }
+                        .sortedByDescending { it.createdAt ?: LocalDateTime.MIN }
+                        .firstOrNull()
+
+                    if (recovered != null) {
+                        activeTrip = recovered
+                    } else if (activeTrip?.status in activeTripStatuses) {
+                        // Keep the current trip until the backend explicitly shows it has ended.
+                    } else {
+                        activeTrip = null
+                    }
+                }
+                is BookingListResult.Error -> {
+                    if (activeTrip?.status !in activeTripStatuses) {
+                        activeTrip = null
+                    }
+                }
+            }
         }
     }
 
@@ -213,15 +359,41 @@ fun DriverPortalScreen(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Set your current availability status and location so dispatch can find you when you are online.",
+            text = "Your job status, current trip, and available rides in one place.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
+        val topAlertMessage = when {
+            !tripMessage.isNullOrBlank() -> tripMessage
+            !message.isNullOrBlank() -> message
+            else -> null
+        }
+        if (!topAlertMessage.isNullOrBlank()) {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Text(
+                    text = topAlertMessage,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
+                containerColor = if (isAvailable) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                }
             )
         ) {
             Column(
@@ -230,11 +402,27 @@ fun DriverPortalScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Driver status",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    DriverStatusBadge(isAvailable)
+                }
+
                 Text(
-                    text = "Current availability status: ${if (isAvailable) "Available" else "Unavailable"}",
+                    text = if (isAvailable) {
+                        "You are online and can receive jobs."
+                    } else {
+                        "You are offline and will not receive dispatch requests."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.SemiBold
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Row(
@@ -245,11 +433,7 @@ fun DriverPortalScreen(
                         onClick = { if (!isAvailable) updateAvailability("AVAILABLE") },
                         modifier = Modifier.weight(1f),
                         enabled = !isLoading && !isAvailable,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("Available")
                     }
@@ -340,7 +524,151 @@ fun DriverPortalScreen(
                         }
                     }
                 }
+            }
+        }
 
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (hasActiveTrip) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = if (hasActiveTrip) "Active trip" else "Current trip",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                if (tripLoading) {
+                    Text(
+                        text = "Loading trip details...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (activeTrip != null) {
+                    val trip = activeTrip!!
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Trip #${trip.id}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        TripStatusBadge(status = trip.status)
+                    }
+
+                    Text(
+                        text = "Requester: ${trip.contactName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    ClickablePhoneText(trip.contactPhone)
+
+                    Text(
+                        text = "Pickup: ${trip.pickupAddress}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Text(
+                        text = "Destination: ${trip.destinationAddress}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    val tripActionButtons: List<Pair<String, () -> Unit>> = buildList {
+                        when (trip.status) {
+                            BookingStatus.DRIVER_HELD -> {
+                                add("Confirm price" to { confirmHeldBooking() })
+                                add("Negotiation failed" to { failNegotiation() })
+                                add("Cancel request" to { cancelHeldBooking() })
+                            }
+                            BookingStatus.CONFIRMED -> {
+                                add("Start trip" to { updateTripStatus(BookingStatus.IN_TRANSIT) })
+                                add("Cancel request" to { cancelHeldBooking() })
+                            }
+                            BookingStatus.ASSIGNED -> {
+                                add("Start trip" to { updateTripStatus(BookingStatus.IN_TRANSIT) })
+                                add("Cancel trip" to { updateTripStatus(BookingStatus.CANCELLED) })
+                            }
+                            BookingStatus.IN_TRANSIT -> {
+                                add("Arrived" to { updateTripStatus(BookingStatus.ARRIVED) })
+                                add("Cancel trip" to { updateTripStatus(BookingStatus.CANCELLED) })
+                            }
+                            BookingStatus.ARRIVED -> {
+                                add("Complete" to { updateTripStatus(BookingStatus.COMPLETED) })
+                                add("Cancel trip" to { updateTripStatus(BookingStatus.CANCELLED) })
+                            }
+                            else -> {
+                                if (trip.status == BookingStatus.ASSIGNED) {
+                                    add("Start trip" to { updateTripStatus(BookingStatus.IN_TRANSIT) })
+                                }
+                                if (trip.status == BookingStatus.IN_TRANSIT) {
+                                    add("Arrived" to { updateTripStatus(BookingStatus.ARRIVED) })
+                                }
+                                if (trip.status == BookingStatus.ARRIVED) {
+                                    add("Complete" to { updateTripStatus(BookingStatus.COMPLETED) })
+                                }
+                                if (trip.status in listOf(
+                                        BookingStatus.ASSIGNED,
+                                        BookingStatus.IN_TRANSIT,
+                                        BookingStatus.ARRIVED,
+                                        BookingStatus.CONFIRMED
+                                    )) {
+                                    add("Cancel trip" to { updateTripStatus(BookingStatus.CANCELLED) })
+                                }
+                            }
+                        }
+                    }
+
+                    if (tripActionButtons.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            tripActionButtons.chunked(2).forEach { rowButtons ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowButtons.forEach { (label, onClick) ->
+                                        Button(
+                                            onClick = onClick,
+                                            modifier = Modifier.weight(1f),
+                                            enabled = !tripLoading,
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(label)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "No active trip right now. When a booking is assigned to you, it will appear here.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
@@ -356,168 +684,89 @@ fun DriverPortalScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = if (activeTrip != null) "Active trip" else "Trip management",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                if (tripLoading) {
-                    Text("Loading trip details...")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Available rides",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (prioritizedAvailableTrips.isEmpty()) "0" else prioritizedAvailableTrips.size.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
 
-                if (activeTrip != null) {
-                    val trip = activeTrip!!
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Trip #${trip.id}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                TripStatusBadge(status = trip.status)
-                            }
-
-                            Text(
-                                text = "Patient: ${trip.contactName}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-
-                            Text(
-                                text = "${trip.pickupAddress} → ${trip.destinationAddress}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (trip.status == BookingStatus.ASSIGNED) {
-                                    Button(
-                                        onClick = { updateTripStatus(BookingStatus.IN_TRANSIT) },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Start trip")
-                                    }
-                                }
-
-                                if (trip.status == BookingStatus.IN_TRANSIT) {
-                                    Button(
-                                        onClick = { updateTripStatus(BookingStatus.ARRIVED) },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Arrived")
-                                    }
-                                }
-
-                                if (trip.status == BookingStatus.ARRIVED) {
-                                    Button(
-                                        onClick = { updateTripStatus(BookingStatus.COMPLETED) },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Complete")
-                                    }
-                                }
-
-                                if (trip.status in listOf(
-                                        BookingStatus.ASSIGNED,
-                                        BookingStatus.IN_TRANSIT,
-                                        BookingStatus.ARRIVED
-                                    )) {
-                                    OutlinedButton(
-                                        onClick = { updateTripStatus(BookingStatus.CANCELLED) },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Cancel")
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if (prioritizedAvailableTrips.isEmpty()) {
+                    Text(
+                        text = "No rides ready for pickup right now. Check back when the dispatch queue refreshes.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 } else {
-                    if (availableBookings.isEmpty()) {
+                    prioritizedAvailableTrips.forEach { booking ->
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         ) {
-                            Text(
-                                text = "No active trip\nNo available trips right now.",
-                                modifier = Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = "Available trips",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        prioritizedAvailableTrips.forEach { booking ->
-                            Card(
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "#${booking.id}",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        TripStatusBadge(status = BookingStatus.REQUESTED)
-                                    }
-
                                     Text(
-                                        text = booking.contactName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium
+                                        text = "Ride #${booking.id}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold
                                     )
+                                    TripStatusBadge(status = booking.status)
+                                }
 
+                                Text(
+                                    text = "Requester: ${booking.contactName}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                ClickablePhoneText(booking.contactPhone)
+
+                                Text(
+                                    text = "Pickup: ${booking.pickupAddress}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Text(
+                                    text = "Destination: ${booking.destinationAddress}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Button(
+                                    onClick = { if (canAcceptTrips) acceptBooking(booking.id) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !tripLoading && canAcceptTrips,
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
                                     Text(
-                                        text = "${booking.pickupAddress} → ${booking.destinationAddress}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        when {
+                                            !isAvailable -> "Go online to accept"
+                                            hasActiveTrip -> "Trip already active"
+                                            else -> "Accept ride"
+                                        }
                                     )
-
-                                    Button(
-                                        onClick = { if (!hasActiveTrip) acceptBooking(booking.id) },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        enabled = !tripLoading && !hasActiveTrip
-                                    ) {
-                                        Text(if (hasActiveTrip) "Trip already active" else "Accept trip")
-                                    }
                                 }
                             }
                         }
@@ -530,7 +779,7 @@ fun DriverPortalScreen(
             Text(
                 text = message ?: "",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (message!!.startsWith("You are now") || message!!.contains("successfully")) {
+                color = if (message!!.startsWith("You are now") || message!!.contains("successfully") || message!!.contains("updated")) {
                     MaterialTheme.colorScheme.primary
                 } else {
                     MaterialTheme.colorScheme.error
@@ -573,14 +822,45 @@ fun DriverPortalScreen(
 }
 
 @Composable
+private fun DriverStatusBadge(isAvailable: Boolean) {
+    val (label, containerColor, contentColor) = if (isAvailable) {
+        Triple("Available", MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+    } else {
+        Triple("Unavailable", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = containerColor,
+        tonalElevation = 0.dp
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier
+                .background(containerColor)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = contentColor,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
 private fun TripStatusBadge(status: BookingStatus) {
     val (label, containerColor, contentColor) = when (status) {
-        BookingStatus.REQUESTED -> Triple("Available", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+        BookingStatus.REQUESTED -> Triple("Open", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+        BookingStatus.DRIVER_HELD -> Triple("Held", MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer)
+        BookingStatus.NEGOTIATION_FAILED -> Triple("Retry", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
+        BookingStatus.REASSIGNMENT_PENDING -> Triple("Requeue", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+        BookingStatus.CONFIRMED -> Triple("Confirmed", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
         BookingStatus.ASSIGNED -> Triple("Assigned", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
         BookingStatus.IN_TRANSIT -> Triple("In transit", MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer)
         BookingStatus.ARRIVED -> Triple("Arrived", MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
         BookingStatus.COMPLETED -> Triple("Completed", MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+        BookingStatus.CANCEL_REQUESTED -> Triple("Canceling", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
         BookingStatus.CANCELLED -> Triple("Cancelled", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
+        BookingStatus.EXPIRED -> Triple("Expired", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
     }
 
     Surface(

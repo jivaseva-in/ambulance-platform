@@ -138,6 +138,69 @@ class BookingRepository(
         }
     }
 
+    suspend fun confirmBooking(token: String, bookingId: Long): BookingSubmissionResult = withContext(Dispatchers.IO) {
+        try {
+            val bearerToken = ensureBearerToken(token)
+            val response = bookingApiService.confirmBooking(bearerToken, bookingId)
+            val body = response.body()
+
+            if (response.isSuccessful && body != null) {
+                BookingSubmissionResult.Success(body)
+            } else {
+                BookingSubmissionResult.Error(
+                    parseErrorMessage(response.errorBody()?.string())
+                        ?: "Could not confirm booking #$bookingId."
+                )
+            }
+        } catch (_: IOException) {
+            BookingSubmissionResult.Error("Could not connect to the ambulance platform backend.")
+        } catch (exception: Exception) {
+            BookingSubmissionResult.Error(exception.message ?: "Unexpected confirm booking error.")
+        }
+    }
+
+    suspend fun failNegotiation(token: String, bookingId: Long, reason: String? = null): BookingSubmissionResult = withContext(Dispatchers.IO) {
+        try {
+            val bearerToken = ensureBearerToken(token)
+            val response = bookingApiService.failNegotiation(bearerToken, bookingId, reason)
+            val body = response.body()
+
+            if (response.isSuccessful && body != null) {
+                BookingSubmissionResult.Success(body)
+            } else {
+                BookingSubmissionResult.Error(
+                    parseErrorMessage(response.errorBody()?.string())
+                        ?: "Could not fail negotiation for booking #$bookingId."
+                )
+            }
+        } catch (_: IOException) {
+            BookingSubmissionResult.Error("Could not connect to the ambulance platform backend.")
+        } catch (exception: Exception) {
+            BookingSubmissionResult.Error(exception.message ?: "Unexpected negotiation failure error.")
+        }
+    }
+
+    suspend fun cancelBookingRequest(token: String, bookingId: Long, reason: String? = null): BookingSubmissionResult = withContext(Dispatchers.IO) {
+        try {
+            val bearerToken = ensureBearerToken(token)
+            val response = bookingApiService.cancelBookingRequest(bearerToken, bookingId, reason)
+            val body = response.body()
+
+            if (response.isSuccessful && body != null) {
+                BookingSubmissionResult.Success(body)
+            } else {
+                BookingSubmissionResult.Error(
+                    parseErrorMessage(response.errorBody()?.string())
+                        ?: "Could not cancel booking request #$bookingId."
+                )
+            }
+        } catch (_: IOException) {
+            BookingSubmissionResult.Error("Could not connect to the ambulance platform backend.")
+        } catch (exception: Exception) {
+            BookingSubmissionResult.Error(exception.message ?: "Unexpected booking cancel request error.")
+        }
+    }
+
     suspend fun getDriverActiveTrip(token: String): BookingLookupResult = withContext(Dispatchers.IO) {
         try {
             val bearerToken = ensureBearerToken(token)
@@ -160,6 +223,27 @@ class BookingRepository(
             BookingLookupResult.Error("Could not connect to the ambulance platform backend.")
         } catch (exception: Exception) {
             BookingLookupResult.Error(exception.message ?: "Unexpected trip lookup error.")
+        }
+    }
+
+    suspend fun getMyBookings(token: String): BookingListResult = withContext(Dispatchers.IO) {
+        try {
+            val bearerToken = ensureBearerToken(token)
+            val response = bookingApiService.getMyBookings(bearerToken)
+            val body = response.body()
+
+            if (response.isSuccessful && body != null) {
+                BookingListResult.Success(body)
+            } else {
+                BookingListResult.Error(
+                    parseErrorMessage(response.errorBody()?.string())
+                        ?: "Could not load your bookings."
+                )
+            }
+        } catch (_: IOException) {
+            BookingListResult.Error("Could not connect to the ambulance platform backend.")
+        } catch (exception: Exception) {
+            BookingListResult.Error(exception.message ?: "Unexpected booking history error.")
         }
     }
 

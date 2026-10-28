@@ -37,6 +37,47 @@ function initTrackingMap(lat, lng) {
     }
 }
 
+function formatLocationText(lat, lng) {
+    if (lat == null || lng == null) return 'Waiting for GPS';
+    return `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`;
+}
+
+function updateTrackingContactInfo(booking, loc) {
+    const driverNameEl = document.getElementById('trackDriverName');
+    const driverPhoneLinkEl = document.getElementById('trackDriverPhoneLink');
+    const currentLocationEl = document.getElementById('trackCurrentLocation');
+    const speedEl = document.getElementById('trackSpeed');
+
+    if (driverNameEl) {
+        driverNameEl.textContent = booking.assignedDriverName || 'Pending allocation...';
+    }
+
+    const driverPhone = booking.driverPhone || 'Not assigned yet';
+    if (driverPhoneLinkEl) {
+        if (driverPhone && driverPhone !== 'Not assigned yet') {
+            driverPhoneLinkEl.href = `tel:${driverPhone}`;
+            driverPhoneLinkEl.textContent = driverPhone;
+            driverPhoneLinkEl.classList.remove('pointer-events-none', 'text-slate-500');
+            driverPhoneLinkEl.classList.add('text-blue-700');
+        } else {
+            driverPhoneLinkEl.href = '#';
+            driverPhoneLinkEl.textContent = 'Not assigned yet';
+            driverPhoneLinkEl.classList.add('pointer-events-none', 'text-slate-500');
+            driverPhoneLinkEl.classList.remove('text-blue-700');
+        }
+    }
+
+    if (currentLocationEl) {
+        const lat = loc?.currentLatitude ?? booking.pickupLatitude ?? null;
+        const lng = loc?.currentLongitude ?? booking.pickupLongitude ?? null;
+        currentLocationEl.textContent = formatLocationText(lat, lng);
+    }
+
+    if (speedEl) {
+        speedEl.textContent = `${(loc?.currentSpeedKmh || 0).toFixed(1)} km/h`;
+    }
+}
+
 export function startLiveTracking(bookingId, pickupLat = 12.9716, pickupLng = 77.5946) {
     state.activeBookingId = bookingId;
     document.getElementById('trackingInfo')?.classList.remove('hidden');
@@ -52,11 +93,11 @@ export function startLiveTracking(bookingId, pickupLat = 12.9716, pickupLng = 77
         try {
             const booking = await api.bookings.getById(bookingId);
             document.getElementById('trackStatusBadge').textContent = booking.status;
-            document.getElementById('trackDriverName').textContent = booking.assignedDriverName || 'Pending driver allocation...';
+            updateTrackingContactInfo(booking, null);
 
             try {
                 const loc = await api.bookings.getLocation(bookingId);
-                document.getElementById('trackSpeed').textContent = (loc.currentSpeedKmh || 0).toFixed(1) + ' km/h';
+                updateTrackingContactInfo(booking, loc);
 
                 if (loc.currentLatitude && loc.currentLongitude) {
                     const ambulanceCoord = [loc.currentLatitude, loc.currentLongitude];

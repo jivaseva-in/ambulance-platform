@@ -55,10 +55,11 @@ function renderDispatchQueue(bookings) {
 
         card.innerHTML = `
             <div class="flex flex-wrap justify-between gap-3 items-start">
-                <div>
+                <div class="flex-1 min-w-0">
                     <div class="font-bold text-slate-800">#${booking.id} - ${booking.contactName}</div>
-                    <div class="text-xs text-slate-600 mt-1">Pickup: ${booking.pickupAddress}</div>
-                    <div class="text-xs text-slate-500">Condition: ${booking.patientCondition || 'Emergency'}</div>
+                    <div class="text-xs text-slate-600 mt-1"><span class="font-semibold">Pickup:</span> ${booking.pickupAddress || 'No pickup address'}</div>
+                    <div class="text-xs text-slate-600"><span class="font-semibold">Caller:</span> <a href="tel:${booking.contactPhone || ''}" class="text-blue-700 hover:underline">${booking.contactPhone || 'No phone available'}</a></div>
+                    <div class="text-xs text-slate-500 mt-1">Destination: ${booking.destinationAddress || 'Not provided'}</div>
                 </div>
                 <div class="text-right text-xs space-y-1">
                     <span class="inline-block px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-semibold">${booking.status}</span>

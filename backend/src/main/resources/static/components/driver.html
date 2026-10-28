@@ -62,7 +62,13 @@
 
         <!-- Action Buttons to Advance Status -->
         <div class="flex flex-wrap items-center gap-2 pt-2">
-            <span class="text-xs font-bold text-slate-500 uppercase mr-1">Advance Status:</span>
+            <span class="text-xs font-bold text-slate-500 uppercase mr-1">Trip Actions:</span>
+            <button id="btnConfirmTrip" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-3 py-2 rounded-lg text-xs shadow flex items-center gap-1 transition">
+                <span>✅</span> Confirm Trip
+            </button>
+            <button id="btnFailNegotiation" class="bg-orange-500 hover:bg-orange-600 text-white font-bold px-3 py-2 rounded-lg text-xs shadow flex items-center gap-1 transition">
+                <span>⚠️</span> Negotiation Failed
+            </button>
             <button id="btnSetInTransit" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-2 rounded-lg text-xs shadow flex items-center gap-1 transition">
                 <span>🚗</span> Mark "IN_TRANSIT"
             </button>
@@ -73,7 +79,7 @@
                 <span>✅</span> Mark "COMPLETED"
             </button>
             <button id="btnSetCancelled" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-2 rounded-lg text-xs shadow flex items-center gap-1 transition">
-                <span>❌</span> Mark "CANCELLED"
+                <span>❌</span> Cancel Trip
             </button>
             <button id="btnPushGpsTelemetry" class="bg-slate-700 hover:bg-slate-800 text-white font-medium px-3 py-2 rounded-lg text-xs shadow ml-auto transition flex items-center gap-1">
                 <span>📡</span> Push Live GPS Ping

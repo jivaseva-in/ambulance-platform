@@ -21,6 +21,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
   // Active trip query for assigned driver using ASSIGNED, IN_TRANSIT, and ARRIVED
   @Query("SELECT b FROM Booking b WHERE b.assignedDriver.email = :driverEmail " +
       "AND b.status IN (com.ambulanceservice.booking.entity.BookingStatus.ASSIGNED, " +
+      "com.ambulanceservice.booking.entity.BookingStatus.CONFIRMED, " +
       "com.ambulanceservice.booking.entity.BookingStatus.IN_TRANSIT, " +
       "com.ambulanceservice.booking.entity.BookingStatus.ARRIVED) " +
       "ORDER BY b.createdAt DESC")
@@ -28,6 +29,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
   @Query("SELECT DISTINCT b.assignedDriver.id FROM Booking b WHERE b.assignedDriver IS NOT NULL " +
       "AND b.status IN (com.ambulanceservice.booking.entity.BookingStatus.REQUESTED, " +
+      "com.ambulanceservice.booking.entity.BookingStatus.DRIVER_HELD, " +
+      "com.ambulanceservice.booking.entity.BookingStatus.CONFIRMED, " +
       "com.ambulanceservice.booking.entity.BookingStatus.ASSIGNED, " +
       "com.ambulanceservice.booking.entity.BookingStatus.IN_TRANSIT, " +
       "com.ambulanceservice.booking.entity.BookingStatus.ARRIVED)")

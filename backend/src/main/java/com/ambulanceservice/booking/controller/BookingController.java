@@ -72,6 +72,42 @@ public class BookingController {
     return ResponseEntity.ok(bookingService.acceptBooking(id, userDetails.getUsername()));
   }
 
+  // 6a. Driver confirms the booking after price negotiation succeeds
+  @PutMapping("/{id}/confirm")
+  @PreAuthorize("hasRole('DRIVER')")
+  public ResponseEntity<BookingResponse> confirmBooking(
+      @PathVariable Long id,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    return ResponseEntity.ok(bookingService.confirmBooking(id, userDetails.getUsername()));
+  }
+
+  // 6b. Driver indicates negotiation failed, so the booking can be re-queued safely
+  @PutMapping("/{id}/negotiation-failed")
+  @PreAuthorize("hasRole('DRIVER')")
+  public ResponseEntity<BookingResponse> failNegotiation(
+      @PathVariable Long id,
+      @RequestParam(required = false) String reason,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    return ResponseEntity.ok(bookingService.failNegotiation(id, userDetails.getUsername(), reason));
+  }
+
+  // 6c. Driver cancels before trip start; request is not silently deleted
+  @PutMapping("/{id}/cancel-request")
+  @PreAuthorize("hasRole('DRIVER')")
+  public ResponseEntity<BookingResponse> cancelBookingRequest(
+      @PathVariable Long id,
+      @RequestParam(required = false) String reason,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    return ResponseEntity.ok(bookingService.cancelBookingRequest(id, userDetails.getUsername(), reason));
+  }
+
+  // 6d. System or dispatcher re-queues a booking after failed negotiation or cancellation request
+  @PutMapping("/{id}/requeue")
+  @PreAuthorize("hasAnyRole('DISPATCHER', 'ADMIN', 'SUPER_ADMIN')")
+  public ResponseEntity<BookingResponse> requeueBooking(@PathVariable Long id) {
+    return ResponseEntity.ok(bookingService.requeueBooking(id));
+  }
+
   // 7. Update status (ASSIGNED -> IN_TRANSIT -> ARRIVED -> COMPLETED / CANCELLED)
   @PutMapping("/{id}/status")
   @PreAuthorize("hasRole('DRIVER')")

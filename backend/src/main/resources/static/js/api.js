@@ -63,6 +63,26 @@ export const api = {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${state.driverToken}` }
             }),
+        confirm: (id) =>
+            request(`/bookings/${id}/confirm`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.driverToken}` }
+            }),
+        failNegotiation: (id, reason = null) =>
+            request(`/bookings/${id}/negotiation-failed${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.driverToken}` }
+            }),
+        cancelRequest: (id, reason = null) =>
+            request(`/bookings/${id}/cancel-request${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.driverToken}` }
+            }),
+        requeue: (id) =>
+            request(`/bookings/${id}/requeue`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${state.dispatcherToken || state.adminToken}` }
+            }),
         updateStatus: (id, status) =>
             request(`/bookings/${id}/status`, {
                 method: 'PUT',

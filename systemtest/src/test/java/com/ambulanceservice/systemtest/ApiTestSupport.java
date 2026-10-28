@@ -82,6 +82,11 @@ public final class ApiTestSupport {
     }
 
     public static Response acceptBooking(ApiClient apiClient, String driverToken, Long bookingId) {
+        Response heldResponse = updateBookingStatus(apiClient, driverToken, bookingId, "DRIVER_HELD", null);
+        if (heldResponse.getStatusCode() == 200 || heldResponse.getStatusCode() == 201 || heldResponse.getStatusCode() == 204) {
+            return heldResponse;
+        }
+
         Map<String, Object> payload = new LinkedHashMap<>();
         return apiClient.putJsonWithAuth("/api/v1/bookings/" + bookingId + "/accept", payload, driverToken);
     }
@@ -108,5 +113,49 @@ public final class ApiTestSupport {
     public static void assertSuccess(Response response, String message) {
         int status = response.getStatusCode();
         Assertions.assertTrue(status == 200 || status == 201 || status == 204, message + " [status=" + status + "]");
+    }
+
+    public static Response requeueBooking(ApiClient apiClient, String driverToken, Long bookingId) {
+        return apiClient.putWithAuth("/api/v1/bookings/" + bookingId + "/requeue", driverToken);
+    }
+
+    public static Response failNegotiation(ApiClient apiClient, String driverToken, Long bookingId, String reason) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        if (reason != null && !reason.isBlank()) {
+            query.put("reason", reason);
+        }
+        return apiClient.putWithAuthAndQuery("/api/v1/bookings/" + bookingId + "/negotiation-failed", driverToken, query);
+    }
+
+    public static Response confirmBooking(ApiClient apiClient, String driverToken, Long bookingId) {
+        return apiClient.putWithAuth("/api/v1/bookings/" + bookingId + "/confirm", driverToken);
+    }
+
+    public static Response cancelBookingRequest(ApiClient apiClient, String bearerToken, Long bookingId, String reason) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        if (reason != null && !reason.isBlank()) {
+            query.put("reason", reason);
+        }
+        return apiClient.putWithAuthAndQuery("/api/v1/bookings/" + bookingId + "/cancel-request", bearerToken, query);
+    }
+
+    public static Response acceptBookingById(ApiClient apiClient, String bearerToken, Long bookingId) {
+        return apiClient.putWithAuth("/api/v1/bookings/" + bookingId + "/accept", bearerToken);
+    }
+
+    public static Response createPhoneBooking(ApiClient apiClient, String adminToken, String phoneNumber, String callerName) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("callerName", callerName);
+        payload.put("callerPhone", phoneNumber);
+        payload.put("pickupAddress", "Phone booking dispatch test address");
+        payload.put("pickupLatitude", 12.9716);
+        payload.put("pickupLongitude", 77.5946);
+        payload.put("destinationHospital", "City General Hospital");
+        payload.put("destinationLatitude", 12.9780);
+        payload.put("destinationLongitude", 77.6000);
+        payload.put("triageNotes", "Chest pain - dispatch request created from system test");
+        payload.put("ambulanceType", "ADVANCED_LIFE_SUPPORT");
+        payload.put("dispatcherInternalNotes", "System test dispatch call");
+        return apiClient.postJsonWithAuth("/api/v1/dispatch/phone-call", payload, adminToken);
     }
 }

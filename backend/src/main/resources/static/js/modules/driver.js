@@ -19,7 +19,9 @@ export function initDriverModule() {
     document.getElementById('btnSetInTransit')?.addEventListener('click', () => handleStatusChange('IN_TRANSIT'));
     document.getElementById('btnSetArrived')?.addEventListener('click', () => handleStatusChange('ARRIVED'));
     document.getElementById('btnSetCompleted')?.addEventListener('click', () => handleStatusChange('COMPLETED'));
-    document.getElementById('btnSetCancelled')?.addEventListener('click', () => handleStatusChange('CANCELLED'));
+    document.getElementById('btnSetCancelled')?.addEventListener('click', handleCancelTrip);
+    document.getElementById('btnConfirmTrip')?.addEventListener('click', handleConfirmTrip);
+    document.getElementById('btnFailNegotiation')?.addEventListener('click', handleFailNegotiation);
     document.getElementById('btnPushGpsTelemetry')?.addEventListener('click', handlePushGps);
 
     if (state.driverToken) {
@@ -70,6 +72,11 @@ export function updateDriverStatusCard(booking) {
         ARRIVED: 'border-violet-200 bg-violet-100 text-violet-800 shadow-sm',
         IN_TRANSIT: 'border-amber-200 bg-amber-100 text-amber-800 shadow-sm',
         ASSIGNED: 'border-blue-200 bg-blue-100 text-blue-800 shadow-sm',
+        CONFIRMED: 'border-blue-200 bg-blue-100 text-blue-800 shadow-sm',
+        DRIVER_HELD: 'border-sky-200 bg-sky-100 text-sky-800 shadow-sm',
+        REASSIGNMENT_PENDING: 'border-cyan-200 bg-cyan-100 text-cyan-800 shadow-sm',
+        NEGOTIATION_FAILED: 'border-orange-200 bg-orange-100 text-orange-800 shadow-sm',
+        CANCEL_REQUESTED: 'border-rose-200 bg-rose-100 text-rose-800 shadow-sm',
         CANCELLED: 'border-rose-200 bg-rose-100 text-rose-800 shadow-sm',
         default: 'border-slate-200 bg-slate-100 text-slate-700 shadow-sm'
     };
@@ -81,7 +88,7 @@ export function updateDriverStatusCard(booking) {
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-2.5 shadow-sm">
             <div class="flex items-start justify-between gap-2">
                 <div>
-                    <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Patient</div>
+                    <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pickup</div>
                     <div class="mt-1 text-sm font-bold text-slate-800">${booking.contactName || 'Emergency patient'}</div>
                 </div>
                 <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">#${booking.id}</span>
@@ -92,12 +99,12 @@ export function updateDriverStatusCard(booking) {
                     <div class="leading-snug"><span class="font-semibold text-slate-700">Pickup:</span> ${booking.pickupAddress || 'No pickup address'}</div>
                 </div>
                 <div class="flex items-start gap-2">
-                    <span class="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-violet-100 text-violet-700">🏥</span>
-                    <div class="leading-snug"><span class="font-semibold text-slate-700">Destination:</span> ${booking.destinationAddress || 'No destination address'}</div>
+                    <span class="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-blue-700">📞</span>
+                    <div class="leading-snug"><span class="font-semibold text-slate-700">Caller:</span> <a href="tel:${booking.contactPhone || ''}" class="text-blue-700 hover:underline">${booking.contactPhone || 'No phone'}</a></div>
                 </div>
                 <div class="flex items-start gap-2">
-                    <span class="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-100 text-amber-700">🩺</span>
-                    <div class="leading-snug"><span class="font-semibold text-slate-700">Condition:</span> ${booking.patientCondition || 'Emergency'}</div>
+                    <span class="mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-violet-100 text-violet-700">🏥</span>
+                    <div class="leading-snug"><span class="font-semibold text-slate-700">Destination:</span> ${booking.destinationAddress || 'No destination address'}</div>
                 </div>
             </div>
         </div>
@@ -157,15 +164,16 @@ export async function loadAvailableJobs() {
         jobs.forEach(job => {
             const assignedToMe = Boolean(job.driverId);
             const card = document.createElement('div');
-            card.className = 'p-4 bg-slate-50 border rounded-lg flex justify-between items-center';
+            card.className = 'p-4 bg-slate-50 border rounded-lg flex justify-between items-center gap-3';
             card.innerHTML = `
-                <div>
-                  <div class="font-bold text-slate-800">#${job.id} - ${job.contactName} (${job.ambulanceType})</div>
-                  <div class="text-xs text-slate-600">Pickup: ${job.pickupAddress}</div>
-                  <div class="text-xs text-slate-500">Condition: ${job.patientCondition || 'Emergency'}</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-slate-800">#${job.id} - ${job.contactName || 'Emergency caller'} (${job.ambulanceType || 'Ambulance'})</div>
+                  <div class="mt-1 text-xs text-slate-600"><span class="font-semibold">Pickup:</span> ${job.pickupAddress || 'No pickup address'}</div>
+                  <div class="text-xs text-slate-600"><span class="font-semibold">Caller:</span> <a href="tel:${job.contactPhone || ''}" class="text-blue-700 hover:underline">${job.contactPhone || 'No phone available'}</a></div>
+                  <div class="text-xs text-slate-500 mt-1">Destination: ${job.destinationAddress || 'Not provided'}</div>
                   <div class="text-xs mt-1 ${assignedToMe ? 'text-blue-700 font-semibold' : 'text-slate-400'}">${assignedToMe ? 'Reserved for you by dispatch/admin' : 'Open queue - any available driver may accept'}</div>
                 </div>
-                <button data-accept-id="${job.id}" class="btn-accept bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded text-xs transition">
+                <button data-accept-id="${job.id}" class="btn-accept bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded text-xs transition shrink-0">
                   ${assignedToMe ? 'Accept Assigned Trip' : 'Accept Trip'}
                 </button>
             `;
@@ -184,7 +192,7 @@ async function acceptJob(bookingId) {
     try {
         const updated = await api.bookings.accept(bookingId);
         setDriverActiveTrip(updated);
-        showAlert(`You accepted booking #${bookingId}! Status: ASSIGNED.`, 'success');
+        showAlert(`You accepted booking #${bookingId}. Negotiation is still open until confirmed.`, 'success');
         updateDriverStatusCard(updated);
         loadAvailableJobs();
     } catch (err) {
@@ -210,6 +218,51 @@ async function handleStatusChange(newStatus) {
         loadAvailableJobs();
     } catch (err) {
         showAlert('Failed to update status: ' + err.message, 'error');
+    }
+}
+
+async function handleCancelTrip() {
+    const bookingId = document.getElementById('driverTargetBookingId').value;
+    if (!bookingId) return showAlert('Please enter or select a Booking ID first!', 'error');
+
+    try {
+        const updated = await api.bookings.cancelRequest(bookingId, 'Driver cancelled by mistake');
+        showAlert(`Trip #${bookingId} cancellation requested and will be reassigned.`, 'success');
+        setDriverActiveTrip(null);
+        updateDriverStatusCard(null);
+        loadAvailableJobs();
+    } catch (err) {
+        showAlert('Failed to cancel trip: ' + err.message, 'error');
+    }
+}
+
+async function handleConfirmTrip() {
+    const bookingId = document.getElementById('driverTargetBookingId').value;
+    if (!bookingId) return showAlert('Please enter or select a Booking ID first!', 'error');
+
+    try {
+        const updated = await api.bookings.confirm(bookingId);
+        showAlert(`Trip #${bookingId} confirmed.`, 'success');
+        setDriverActiveTrip(updated);
+        updateDriverStatusCard(updated);
+        loadAvailableJobs();
+    } catch (err) {
+        showAlert('Failed to confirm trip: ' + err.message, 'error');
+    }
+}
+
+async function handleFailNegotiation() {
+    const bookingId = document.getElementById('driverTargetBookingId').value;
+    if (!bookingId) return showAlert('Please enter or select a Booking ID first!', 'error');
+
+    try {
+        const updated = await api.bookings.failNegotiation(bookingId, 'Price negotiation failed');
+        showAlert(`Trip #${bookingId} negotiation failed and was re-queued.`, 'success');
+        setDriverActiveTrip(null);
+        updateDriverStatusCard(null);
+        loadAvailableJobs();
+    } catch (err) {
+        showAlert('Failed to mark negotiation as failed: ' + err.message, 'error');
     }
 }
 

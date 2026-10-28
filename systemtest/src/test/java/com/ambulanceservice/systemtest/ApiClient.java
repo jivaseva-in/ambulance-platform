@@ -69,11 +69,52 @@ public class ApiClient {
             .response();
     }
 
+    public Response putJson(String path, Object body) {
+        return RestAssured.given()
+            .contentType(ContentType.JSON)
+            .body(body)
+            .when()
+            .put(baseUrl + path)
+            .then()
+            .extract()
+            .response();
+    }
+
     public Response putJsonWithAuth(String path, Object body, String bearerToken) {
         return RestAssured.given()
             .contentType(ContentType.JSON)
             .header("Authorization", "Bearer " + bearerToken)
             .body(body)
+            .when()
+            .put(baseUrl + path)
+            .then()
+            .extract()
+            .response();
+    }
+
+    public Response put(String path) {
+        return RestAssured.given()
+            .when()
+            .put(baseUrl + path)
+            .then()
+            .extract()
+            .response();
+    }
+
+    public Response putWithAuth(String path, String bearerToken) {
+        return RestAssured.given()
+            .header("Authorization", "Bearer " + bearerToken)
+            .when()
+            .put(baseUrl + path)
+            .then()
+            .extract()
+            .response();
+    }
+
+    public Response putWithAuthAndQuery(String path, String bearerToken, Map<String, ?> queryParams) {
+        return RestAssured.given()
+            .header("Authorization", "Bearer " + bearerToken)
+            .queryParams(queryParams)
             .when()
             .put(baseUrl + path)
             .then()

@@ -202,6 +202,146 @@
         }
       }
     },
+    "/api/v1/bookings/{id}/requeue": {
+      "put": {
+        "tags": [
+          "booking-controller"
+        ],
+        "operationId": "requeueBooking",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/{id}/negotiation-failed": {
+      "put": {
+        "tags": [
+          "booking-controller"
+        ],
+        "operationId": "failNegotiation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/{id}/confirm": {
+      "put": {
+        "tags": [
+          "booking-controller"
+        ],
+        "operationId": "confirmBooking",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/{id}/cancel-request": {
+      "put": {
+        "tags": [
+          "booking-controller"
+        ],
+        "operationId": "cancelBookingRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/bookings/{id}/accept": {
       "put": {
         "tags": [
@@ -1063,11 +1203,17 @@
             "type": "string",
             "enum": [
               "REQUESTED",
+              "DRIVER_HELD",
+              "NEGOTIATION_FAILED",
+              "REASSIGNMENT_PENDING",
+              "CONFIRMED",
               "ASSIGNED",
               "IN_TRANSIT",
               "ARRIVED",
               "COMPLETED",
-              "CANCELLED"
+              "CANCEL_REQUESTED",
+              "CANCELLED",
+              "EXPIRED"
             ]
           },
           "requesterId": {
@@ -1136,11 +1282,17 @@
             "type": "string",
             "enum": [
               "REQUESTED",
+              "DRIVER_HELD",
+              "NEGOTIATION_FAILED",
+              "REASSIGNMENT_PENDING",
+              "CONFIRMED",
               "ASSIGNED",
               "IN_TRANSIT",
               "ARRIVED",
               "COMPLETED",
-              "CANCELLED"
+              "CANCEL_REQUESTED",
+              "CANCELLED",
+              "EXPIRED"
             ]
           },
           "cancellationReason": {

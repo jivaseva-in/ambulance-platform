@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -119,21 +120,170 @@ public class BookingService {
     User driver = getUserByEmail(driverEmail);
     Long driverId = driver.getId();
 
-    List<Booking> unassigned = bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.REQUESTED)
-        .stream()
+    List<Booking> available = java.util.stream.Stream.of(
+            bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.REQUESTED),
+            bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.REASSIGNMENT_PENDING),
+            bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.NEGOTIATION_FAILED),
+            bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.CANCEL_REQUESTED)
+        )
+        .flatMap(List::stream)
         .filter(booking -> booking.getAssignedDriver() == null)
         .toList();
-    List<Booking> assignedToDriver = bookingRepository.findByStatusAndAssignedDriverIdOrderByCreatedAtDesc(BookingStatus.REQUESTED, driverId);
 
-    return java.util.stream.Stream.concat(unassigned.stream(), assignedToDriver.stream())
+    List<Booking> driverHeld = bookingRepository.findByStatusAndAssignedDriverIdOrderByCreatedAtDesc(BookingStatus.DRIVER_HELD, driverId);
+    List<Booking> driverConfirmed = bookingRepository.findByStatusAndAssignedDriverIdOrderByCreatedAtDesc(BookingStatus.CONFIRMED, driverId);
+
+    return java.util.stream.Stream.concat(
+            java.util.stream.Stream.concat(available.stream(), driverHeld.stream()),
+            driverConfirmed.stream())
         .distinct()
         .map(BookingResponse::fromEntity)
         .toList();
   }
 
   public List<BookingResponse> getOpenDispatchBookings() {
-    return bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.REQUESTED)
-        .stream().map(BookingResponse::fromEntity).toList();
+    return java.util.stream.Stream.of(
+            bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.REQUESTED),
+            bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.REASSIGNMENT_PENDING),
+            bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.NEGOTIATION_FAILED),
+            bookingRepository.findByStatusOrderByCreatedAtDesc(BookingStatus.CANCEL_REQUESTED))
+        .flatMap(List::stream)
+        .distinct()
+        .map(BookingResponse::fromEntity)
+        .toList();
+  }
+
+  @Transactional
+  public BookingResponse cancelBookingRequest(Long bookingId, String driverEmail, String reason) {
+    Booking booking = bookingRepository.findById(bookingId)
+        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
+
+    ensureAssignedDriver(booking, driverEmail);
+    if (booking.getStatus() == BookingStatus.CANCEL_REQUESTED || booking.getStatus() == BookingStatus.CANCELLED
+        || booking.getStatus() == BookingStatus.COMPLETED || booking.getStatus() == BookingStatus.EXPIRED) {
+      throw new IllegalStateException("This booking cannot be cancelled again.");
+    }
+
+    if (booking.getStatus() == BookingStatus.IN_TRANSIT || booking.getStatus() == BookingStatus.ARRIVED) {
+      throw new IllegalStateException("Cancellation after trip start requires dispatcher approval.");
+    }
+
+    booking.setAssignedDriver(null);
+    booking.setStatus(BookingStatus.REASSIGNMENT_PENDING);
+    booking.setCancellationReason(reason != null && !reason.isBlank() ? reason : "Driver cancelled by mistake");
+
+    return BookingResponse.fromEntity(bookingRepository.save(booking));
+  }
+
+  @Transactional
+  public BookingResponse requeueBooking(Long bookingId) {
+    Booking booking = bookingRepository.findById(bookingId)
+        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
+
+    if (booking.getStatus() != BookingStatus.NEGOTIATION_FAILED
+        && booking.getStatus() != BookingStatus.CANCEL_REQUESTED
+        && booking.getStatus() != BookingStatus.REASSIGNMENT_PENDING) {
+      throw new IllegalStateException("This booking cannot be re-queued in its current state.");
+    }
+
+    booking.setAssignedDriver(null);
+    booking.setStatus(BookingStatus.REASSIGNMENT_PENDING);
+    return BookingResponse.fromEntity(bookingRepository.save(booking));
+  }
+
+  @Transactional
+  public BookingResponse failNegotiation(Long bookingId, String driverEmail, String reason) {
+    Booking booking = bookingRepository.findById(bookingId)
+        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
+
+    ensureAssignedDriver(booking, driverEmail);
+    if (booking.getStatus() != BookingStatus.DRIVER_HELD && booking.getStatus() != BookingStatus.CONFIRMED) {
+      throw new IllegalStateException("Only a held or confirmed booking can fail negotiation.");
+    }
+
+    booking.setAssignedDriver(null);
+    booking.setStatus(BookingStatus.REASSIGNMENT_PENDING);
+    booking.setCancellationReason(reason != null && !reason.isBlank() ? reason : "Price negotiation failed");
+
+    return BookingResponse.fromEntity(bookingRepository.save(booking));
+  }
+
+  @Transactional
+  public BookingResponse assignDriver(Long bookingId, AssignDriverRequest request, String dispatcherEmail) {
+    ensureDispatchCapable(dispatcherEmail, "assign drivers");
+    Booking booking = getRequestedBookingForDispatch(bookingId, "assign");
+
+    User driver = userRepository.findById(request.driverId())
+        .orElseThrow(() -> new ResourceNotFoundException("Driver not found with id: " + request.driverId()));
+
+    if (driver.getRole() != Role.ROLE_DRIVER) {
+      throw new IllegalArgumentException("Selected user is not a driver.");
+    }
+
+    if (driver.getStatus() != UserStatus.ACTIVE) {
+      throw new IllegalStateException("Only active drivers can receive dispatch assignments.");
+    }
+
+    if (!bookingRepository.findActiveTripsByDriverEmail(driver.getEmail()).isEmpty()) {
+      throw new IllegalStateException("Selected driver already has an active trip.");
+    }
+
+    booking.setAssignedDriver(driver);
+    booking.setStatus(BookingStatus.CONFIRMED);
+    return BookingResponse.fromEntity(bookingRepository.save(booking));
+  }
+
+  @Transactional
+  public BookingResponse updateStatus(Long bookingId, UpdateBookingStatusRequest request, String userEmail) {
+    Booking booking = bookingRepository.findById(bookingId)
+        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
+
+    ensureAssignedDriver(booking, userEmail);
+    validateDriverStatusTransition(booking.getStatus(), request.status());
+
+    booking.setStatus(request.status());
+
+    if (request.status() == BookingStatus.COMPLETED) {
+      booking.setCompletedAt(LocalDateTime.now());
+    }
+
+    if (request.status() == BookingStatus.CANCELLED) {
+      booking.setCancellationReason(request.cancellationReason());
+    }
+
+    return BookingResponse.fromEntity(bookingRepository.save(booking));
+  }
+
+  private Booking getRequestedBookingForDispatch(Long bookingId, String action) {
+    Booking booking = bookingRepository.findById(bookingId)
+        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
+
+    if (booking.getStatus() != BookingStatus.REQUESTED && booking.getStatus() != BookingStatus.REASSIGNMENT_PENDING) {
+      throw new IllegalStateException("Only requested or re-assignment pending bookings can be updated by dispatch to " + action + " a driver.");
+    }
+
+    return booking;
+  }
+
+  private void validateDriverStatusTransition(BookingStatus currentStatus, BookingStatus requestedStatus) {
+    boolean valid = switch (currentStatus) {
+      case REQUESTED -> requestedStatus == BookingStatus.DRIVER_HELD || requestedStatus == BookingStatus.CANCELLED;
+      case DRIVER_HELD -> requestedStatus == BookingStatus.CONFIRMED || requestedStatus == BookingStatus.CANCEL_REQUESTED
+          || requestedStatus == BookingStatus.CANCELLED;
+      case CONFIRMED -> requestedStatus == BookingStatus.IN_TRANSIT || requestedStatus == BookingStatus.CANCEL_REQUESTED
+          || requestedStatus == BookingStatus.CANCELLED;
+      case ASSIGNED -> requestedStatus == BookingStatus.IN_TRANSIT || requestedStatus == BookingStatus.CANCEL_REQUESTED
+          || requestedStatus == BookingStatus.CANCELLED;
+      case IN_TRANSIT -> requestedStatus == BookingStatus.ARRIVED || requestedStatus == BookingStatus.CANCEL_REQUESTED
+          || requestedStatus == BookingStatus.CANCELLED;
+      case ARRIVED -> requestedStatus == BookingStatus.COMPLETED || requestedStatus == BookingStatus.CANCEL_REQUESTED
+          || requestedStatus == BookingStatus.CANCELLED;
+      default -> false;
+    };
+
+    if (!valid) {
+      throw new IllegalStateException("Invalid booking status transition: " + currentStatus + " -> " + requestedStatus);
+    }
   }
 
   public List<AvailableDriverResponse> getAvailableDriversForDispatch() {
@@ -168,94 +318,24 @@ public class BookingService {
 
   public Optional<BookingResponse> getActiveTripForDriver(String driverEmail) {
     List<Booking> activeTrips = bookingRepository.findActiveTripsByDriverEmail(driverEmail);
-    if (activeTrips.isEmpty()) {
-      return Optional.empty();
-    }
-    return Optional.of(BookingResponse.fromEntity(activeTrips.get(0)));
-  }
-
-  @Transactional
-  public BookingResponse acceptBooking(Long bookingId, String driverEmail) {
-    Booking booking = bookingRepository.findById(bookingId)
-        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
-
-    if (booking.getStatus() != BookingStatus.REQUESTED) {
-      throw new IllegalStateException("Booking is already assigned or closed");
+    if (!activeTrips.isEmpty()) {
+      return Optional.of(BookingResponse.fromEntity(activeTrips.get(0)));
     }
 
-    User driver = userRepository.findByEmail(driverEmail)
-        .orElseThrow(() -> new ResourceNotFoundException("Driver not found with email: " + driverEmail));
+    List<Booking> assignedTrips = bookingRepository.findByAssignedDriverIdOrderByCreatedAtDesc(
+        userRepository.findByEmail(driverEmail)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + driverEmail))
+            .getId());
 
-    if (!bookingRepository.findActiveTripsByDriverEmail(driverEmail).isEmpty()) {
-      throw new IllegalStateException("Driver already has an active trip.");
-    }
-
-    if (booking.getAssignedDriver() != null && !booking.getAssignedDriver().getId().equals(driver.getId())) {
-      throw new IllegalStateException("This booking has already been reserved for another driver.");
-    }
-
-    booking.setAssignedDriver(driver);
-    booking.setStatus(BookingStatus.ASSIGNED);
-
-    return BookingResponse.fromEntity(bookingRepository.save(booking));
-  }
-
-  @Transactional
-  public BookingResponse assignDriver(Long bookingId, AssignDriverRequest request, String dispatcherEmail) {
-    ensureDispatchCapable(dispatcherEmail, "assign drivers");
-    Booking booking = getRequestedBookingForDispatch(bookingId, "assign");
-
-    User driver = userRepository.findById(request.driverId())
-        .orElseThrow(() -> new ResourceNotFoundException("Driver not found with id: " + request.driverId()));
-
-    if (driver.getRole() != Role.ROLE_DRIVER) {
-      throw new IllegalArgumentException("Selected user is not a driver.");
-    }
-
-    if (driver.getStatus() != UserStatus.ACTIVE) {
-      throw new IllegalStateException("Only active drivers can receive dispatch assignments.");
-    }
-
-    if (!bookingRepository.findActiveTripsByDriverEmail(driver.getEmail()).isEmpty()) {
-      throw new IllegalStateException("Selected driver already has an active trip.");
-    }
-
-    booking.setAssignedDriver(driver);
-    return BookingResponse.fromEntity(bookingRepository.save(booking));
-  }
-
-  @Transactional
-  public BookingResponse unassignDriver(Long bookingId, String dispatcherEmail) {
-    ensureDispatchCapable(dispatcherEmail, "unassign drivers");
-    Booking booking = getRequestedBookingForDispatch(bookingId, "unassign");
-
-    if (booking.getAssignedDriver() == null) {
-      throw new IllegalStateException("This booking is not currently reserved for any driver.");
-    }
-
-    booking.setAssignedDriver(null);
-    return BookingResponse.fromEntity(bookingRepository.save(booking));
-  }
-
-  @Transactional
-  public BookingResponse updateStatus(Long bookingId, UpdateBookingStatusRequest request, String userEmail) {
-    Booking booking = bookingRepository.findById(bookingId)
-        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
-
-    ensureAssignedDriver(booking, userEmail);
-    validateDriverStatusTransition(booking.getStatus(), request.status());
-
-    booking.setStatus(request.status());
-
-    if (request.status() == BookingStatus.COMPLETED) {
-      booking.setCompletedAt(LocalDateTime.now());
-    }
-
-    if (request.status() == BookingStatus.CANCELLED) {
-      booking.setCancellationReason(request.cancellationReason());
-    }
-
-    return BookingResponse.fromEntity(bookingRepository.save(booking));
+    return assignedTrips.stream()
+        .filter(booking -> booking.getStatus() == BookingStatus.DRIVER_HELD
+            || booking.getStatus() == BookingStatus.CONFIRMED
+            || booking.getStatus() == BookingStatus.ASSIGNED
+            || booking.getStatus() == BookingStatus.IN_TRANSIT
+            || booking.getStatus() == BookingStatus.ARRIVED)
+        .sorted(Comparator.comparing(Booking::getCreatedAt).reversed())
+        .findFirst()
+        .map(BookingResponse::fromEntity);
   }
 
   public BookingResponse getBookingByPhone(String phoneNumber) {
@@ -284,6 +364,19 @@ public class BookingService {
     return digits;
   }
 
+  public BookingResponse unassignDriver(Long bookingId, String dispatcherEmail) {
+    ensureDispatchCapable(dispatcherEmail, "unassign drivers");
+    Booking booking = getRequestedBookingForDispatch(bookingId, "unassign");
+
+    if (booking.getAssignedDriver() == null) {
+      throw new IllegalStateException("This booking is not currently reserved for any driver.");
+    }
+
+    booking.setAssignedDriver(null);
+    booking.setStatus(BookingStatus.REQUESTED);
+    return BookingResponse.fromEntity(bookingRepository.save(booking));
+  }
+
   private User getUserByEmail(String email) {
     return userRepository.findByEmail(email)
         .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
@@ -300,33 +393,55 @@ public class BookingService {
     }
   }
 
-  private Booking getRequestedBookingForDispatch(Long bookingId, String action) {
-    Booking booking = bookingRepository.findById(bookingId)
-        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
-
-    if (booking.getStatus() != BookingStatus.REQUESTED) {
-      throw new IllegalStateException("Only requested bookings can be updated by dispatch to " + action + " a driver.");
-    }
-
-    return booking;
-  }
-
   private void ensureAssignedDriver(Booking booking, String userEmail) {
     if (booking.getAssignedDriver() == null || !booking.getAssignedDriver().getEmail().equalsIgnoreCase(userEmail)) {
       throw new IllegalStateException("Only the assigned driver can update this booking.");
     }
   }
 
-  private void validateDriverStatusTransition(BookingStatus currentStatus, BookingStatus requestedStatus) {
-    boolean valid = switch (currentStatus) {
-      case ASSIGNED -> requestedStatus == BookingStatus.IN_TRANSIT || requestedStatus == BookingStatus.CANCELLED;
-      case IN_TRANSIT -> requestedStatus == BookingStatus.ARRIVED || requestedStatus == BookingStatus.CANCELLED;
-      case ARRIVED -> requestedStatus == BookingStatus.COMPLETED || requestedStatus == BookingStatus.CANCELLED;
-      default -> false;
-    };
+  @Transactional
+  public BookingResponse acceptBooking(Long bookingId, String driverEmail) {
+    Booking booking = bookingRepository.findById(bookingId)
+        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
 
-    if (!valid) {
-      throw new IllegalStateException("Invalid booking status transition: " + currentStatus + " -> " + requestedStatus);
+    if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.COMPLETED
+        || booking.getStatus() == BookingStatus.EXPIRED) {
+      throw new IllegalStateException("This booking is no longer active.");
     }
+
+    if (booking.getStatus() != BookingStatus.REQUESTED && booking.getStatus() != BookingStatus.REASSIGNMENT_PENDING) {
+      throw new IllegalStateException("Booking is not available for a new driver hold.");
+    }
+
+    User driver = userRepository.findByEmail(driverEmail)
+        .orElseThrow(() -> new ResourceNotFoundException("Driver not found with email: " + driverEmail));
+
+    if (!bookingRepository.findActiveTripsByDriverEmail(driverEmail).isEmpty()) {
+      throw new IllegalStateException("Driver already has an active trip.");
+    }
+
+    if (booking.getAssignedDriver() != null && !booking.getAssignedDriver().getId().equals(driver.getId())) {
+      throw new IllegalStateException("This booking has already been reserved for another driver.");
+    }
+
+    booking.setAssignedDriver(driver);
+    booking.setStatus(BookingStatus.DRIVER_HELD);
+
+    return BookingResponse.fromEntity(bookingRepository.save(booking));
   }
+
+  @Transactional
+  public BookingResponse confirmBooking(Long bookingId, String driverEmail) {
+    Booking booking = bookingRepository.findById(bookingId)
+        .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
+
+    ensureAssignedDriver(booking, driverEmail);
+    if (booking.getStatus() != BookingStatus.DRIVER_HELD) {
+      throw new IllegalStateException("Only a held booking can be confirmed.");
+    }
+
+    booking.setStatus(BookingStatus.CONFIRMED);
+    return BookingResponse.fromEntity(bookingRepository.save(booking));
+  }
+
 }

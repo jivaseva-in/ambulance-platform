@@ -159,6 +159,15 @@ fun BookingScreen(
 
                 DriverAccessCard(onDriverAccessClick = onDriverAccessClick)
 
+                if (uiState.showTrackingResult && uiState.trackedBooking != null) {
+                    TrackingCard(
+                        booking = uiState.trackedBooking,
+                        liveLocation = uiState.liveLocation,
+                        onRefreshLiveLocation = { onRefreshLiveLocation(uiState.trackedBooking.id) },
+                        onDismiss = onDismissTrackingResult
+                    )
+                }
+
                 if (uiState.showErrorMessage && uiState.errorMessage != null) {
                     MessageCard(
                         title = if (uiState.isTracking) "Could not load booking" else "Could not submit booking",
@@ -174,15 +183,6 @@ fun BookingScreen(
                         message = uiState.successMessage,
                         booking = uiState.submittedBooking,
                         onDismiss = onDismissMessage
-                    )
-                }
-
-                if (uiState.showTrackingResult && uiState.trackedBooking != null) {
-                    TrackingCard(
-                        booking = uiState.trackedBooking,
-                        liveLocation = uiState.liveLocation,
-                        onRefreshLiveLocation = { onRefreshLiveLocation(uiState.trackedBooking.id) },
-                        onDismiss = onDismissTrackingResult
                     )
                 }
             }
@@ -477,6 +477,23 @@ private fun TrackingLookupCard(
 }
 
 @Composable
+private fun ClickablePhoneText(phone: String?, label: String = "Call") {
+    val context = LocalContext.current
+    val sanitizedPhone = phone?.replace(Regex("[^+\\d]"), "")?.trim()
+
+    Text(
+        text = if (sanitizedPhone.isNullOrBlank()) "$label: unavailable" else "$label: $sanitizedPhone",
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (sanitizedPhone.isNullOrBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.clickable(enabled = !sanitizedPhone.isNullOrBlank()) {
+            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$sanitizedPhone"))
+            context.startActivity(dialIntent)
+        }
+    )
+}
+
+@Composable
 private fun TrackingCard(
     booking: BookingResponse,
     liveLocation: com.ambulanceservice.mobile.data.booking.model.LocationResponse?,
@@ -490,41 +507,90 @@ private fun TrackingCard(
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Live booking status",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Column {
+                    Text(
+                        text = "Live booking status",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Booking #${booking.id}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 IconButton(onClick = onDismiss) {
                     Text("×")
                 }
             }
-            Text("Booking ID: #${booking.id}")
-            Text("Status: ${booking.status}")
-            Text("Pickup: ${booking.pickupAddress}")
-            Text("Destination: ${booking.destinationAddress}")
-            Text("Assigned driver: ${booking.driverName ?: "Awaiting assignment"}")
+
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                tonalElevation = 0.dp
+            ) {
+                Text(
+                    text = booking.status.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Text(
+                text = "Pickup: ${booking.pickupAddress}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+
+            Text(
+                text = "Destination: ${booking.destinationAddress}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+
+            if (booking.driverName != null) {
+                Text(
+                    text = "Assigned driver: ${booking.driverName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = "Assigned driver: Awaiting assignment",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (liveLocation != null || !booking.driverName.isNullOrBlank()) {
+                ClickablePhoneText(
+                    phone = booking.driverPhone ?: liveLocation?.driverPhone,
+                    label = "Driver phone"
+                )
+            }
 
             if (liveLocation != null) {
-                Text("Vehicle location: ${liveLocation.driverLatitude}, ${liveLocation.driverLongitude}")
-                Text("Last update: ${liveLocation.lastUpdated ?: "Unavailable"}")
-                Text("Driver phone: ${liveLocation.driverPhone ?: "Unavailable"}")
-            } else {
-                Text("Location: Awaiting live GPS update from the driver.")
+                Text(
+                    text = "Live GPS updated: ${liveLocation.lastUpdated ?: "Recently"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Button(
                 onClick = onRefreshLiveLocation,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Refresh live location")
+                Text("Refresh live status")
             }
         }
     }
@@ -851,37 +917,37 @@ private fun PickupLocationSelector(
     }
 }
 
+
 @Composable
 private fun DriverAccessCard(onDriverAccessClick: () -> Unit) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Driver portal",
+                text = "Driver access",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "Registered drivers can log in or register here to serve incoming ambulance requests.",
+                text = "Open the driver portal to view trip status and update your availability.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Button(
                 onClick = onDriverAccessClick,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Driver access")
+                Text("Open driver portal")
             }
         }
     }
