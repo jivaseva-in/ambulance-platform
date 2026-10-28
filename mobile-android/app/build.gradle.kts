@@ -1,5 +1,5 @@
 val localApiBaseUrl = providers.gradleProperty("API_BASE_URL_LOCAL")
-    .orElse("http://10.0.2.2:8080/")
+    .orElse("http://192.168.0.18:8080/") // "http://10.0.2.2:8080/"
     .get()
 
 val renderApiBaseUrl = providers.gradleProperty("API_BASE_URL_RENDER")

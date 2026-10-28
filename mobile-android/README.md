@@ -19,7 +19,7 @@ This module contains the first Android MVP for the ambulance service.
 
 The app is configured with product flavors:
 
-- `local` → default base URL `http://10.0.2.2:8080/`
+- `local` → default base URL `http://192.168.0.18:8080/` (Laptop on Wi-Fi) or http://10.0.2.2:8080/
 - `render` → placeholder Render URL for future deployment
 
 You can override these URLs with Gradle properties:
@@ -30,7 +30,7 @@ You can override these URLs with Gradle properties:
 Example `gradle.properties` entries:
 
 ```properties
-API_BASE_URL_LOCAL=http://10.0.2.2:8080/
+API_BASE_URL_LOCAL=http://192.168.0.18:8080/ or http://10.0.2.2:8080/
 API_BASE_URL_RENDER=https://your-render-service.onrender.com/
 ```
 
@@ -66,16 +66,39 @@ installed app's package/SHA-1 restrictions in Google Cloud.
 
 ## Local backend notes
 
-For the Android emulator, use `10.0.2.2` to reach your host machine.
+### Physical Android phone over Wi-Fi
 
-If your backend is running on:
+The local flavor targets at `http://192.168.0.18:8080/`.
+Connect the phone and laptop to the same Wi-Fi and configure the backend with:
 
-- `server.port=8080`
-- `server.address=127.0.0.1`
+```properties
+server.port=8080
+server.address=0.0.0.0
+```
 
-then the emulator can still usually reach it through `http://10.0.2.2:8080/`.
+Allow incoming backend connections in the laptop firewall. If using Docker, publish
+port 8080. Confirm the phone can open `http://192.168.0.18:8080/` in its browser.
+Guest Wi-Fi/client isolation or VPN routing may prevent LAN access.
 
-If you later test on a physical device, you will likely need the backend to bind to all interfaces instead of only `127.0.0.1`.
+Build the local debug variant with the command below, then transfer
+`app\build\outputs\apk\local\debug\app-local-debug.apk` to the phone and open it
+to install. Allow installation from that trusted file source if Android prompts.
+No USB debugging or special phone network settings are required.
+
+The local-flavor resource `app\src\local\res\xml\network_security_config.xml`
+allows HTTP to this laptop IP, localhost, and the emulator host. The Render
+flavor's network policy is unchanged. If the laptop's IP changes, update both
+`API_BASE_URL_LOCAL` and the local HTTP allowlist, then rebuild and reinstall.
+Keep the trailing slash on the base URL. Use HTTP only on a trusted development
+network; do not expose this backend publicly.
+
+### Android emulator
+
+To reach a backend on the emulator's host machine, override the local base URL:
+
+```powershell
+.\gradlew.bat :app:assembleLocalDebug "-PAPI_BASE_URL_LOCAL=http://10.0.2.2:8080/"
+```
 
 ## Run locally
 

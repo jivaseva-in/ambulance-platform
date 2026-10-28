@@ -25,8 +25,12 @@ WORKDIR /app
 # Copy the executable JAR from the builder stage
 COPY --from=builder /app/target/*.jar app.jar
 
-# Expose the port the application runs on
+# Cloud Run injects a dynamic port via the PORT environment variable (usually 8080).
+# Exposing a static port in Docker is ignored by Cloud Run, but we define the default here.
+ENV PORT=8080
 EXPOSE 8080
 
-# Set the command to run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# OPTIMIZED RUN COMMAND FOR CLOUD RUN:
+# 1. We dynamically bind to the $PORT variable provided by Google Cloud.
+# 2. We add JVM optimizations (-XX:+UseG1GC, -XX:MaxRAMPercentage) to keep memory usage low.
+ENTRYPOINT ["java", "-Dserver.port=${PORT}", "-XX:+UseG1GC", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
